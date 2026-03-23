@@ -19,7 +19,7 @@ let server: {
 describe('Login Page', () => {
   beforeAll(async () => {
     server = await startMock({
-      port: 8000,
+      port: 3018,
       scene: 'login',
     });
   });
