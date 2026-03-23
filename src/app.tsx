@@ -3,7 +3,6 @@ import type { Settings as LayoutSettings } from '@ant-design/pro-components';
 import { SettingDrawer } from '@ant-design/pro-components';
 import type { RequestConfig, RunTimeLayoutConfig } from '@umijs/max';
 import { history, Link } from '@umijs/max';
-import React from 'react';
 import {
   AvatarDropdown,
   AvatarName,
@@ -13,7 +12,7 @@ import {
 } from '@/components';
 import { currentUser as queryCurrentUser } from '@/services/ant-design-pro/api';
 import defaultSettings from '../config/defaultSettings';
-import { errorConfig } from './requestErrorConfig';
+import { errorConfig, getToken } from './requestErrorConfig';
 
 const isDev = process.env.NODE_ENV === 'development';
 const isDevOrTest = isDev || process.env.CI;
@@ -30,10 +29,18 @@ export async function getInitialState(): Promise<{
 }> {
   const fetchUserInfo = async () => {
     try {
+      if (!getToken()) {
+        return undefined;
+      }
       const msg = await queryCurrentUser({
         skipErrorHandler: true,
       });
-      return msg.data;
+      return {
+        ...msg,
+        name:
+          `${msg.firstName || ''} ${msg.lastName || ''}`.trim() || msg.email,
+        access: msg.role?.id === 1 ? 'admin' : 'user',
+      };
     } catch (_error) {
       history.push(loginPath);
     }

@@ -3,10 +3,13 @@
 
 declare namespace API {
   type CurrentUser = {
+    id?: number;
     name?: string;
     avatar?: string;
     userid?: string;
     email?: string;
+    firstName?: string;
+    lastName?: string;
     signature?: string;
     title?: string;
     group?: string;
@@ -15,6 +18,7 @@ declare namespace API {
     unreadCount?: number;
     country?: string;
     access?: string;
+    role?: { id?: number };
     geographic?: {
       province?: { label?: string; key?: string };
       city?: { label?: string; key?: string };
@@ -24,9 +28,10 @@ declare namespace API {
   };
 
   type LoginResult = {
-    status?: string;
-    type?: string;
-    currentAuthority?: string;
+    token?: string;
+    refreshToken?: string;
+    tokenExpires?: number;
+    user?: CurrentUser;
   };
 
   type PageParams = {
@@ -62,10 +67,17 @@ declare namespace API {
   };
 
   type LoginParams = {
-    username?: string;
+    email?: string;
     password?: string;
     autoLogin?: boolean;
     type?: string;
+  };
+
+  type RegisterParams = {
+    email?: string;
+    password?: string;
+    firstName?: string;
+    lastName?: string;
   };
 
   type ErrorResponse = {
