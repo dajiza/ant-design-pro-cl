@@ -10,7 +10,7 @@ export default async (): Promise<any> => {
     ...config,
     testEnvironmentOptions: {
       ...(config?.testEnvironmentOptions || {}),
-      url: 'http://localhost:3018',
+      url: 'http://localhost:8000',
     },
     setupFiles: [...(config.setupFiles || []), './tests/setupTests.jsx'],
     globals: {
