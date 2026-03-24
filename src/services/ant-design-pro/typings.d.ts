@@ -110,4 +110,24 @@ declare namespace API {
     description?: string;
     type?: NoticeIconItemType;
   };
+
+  type ClientItem = {
+    id: string;
+    active: boolean;
+    appointmentCount: number;
+    createdAt: string;
+    currentAccountBalance: number;
+    email?: string | null;
+    firstName?: string | null;
+    hasCardOnFile: boolean;
+    lastName?: string | null;
+    mobilePhone?: string | null;
+    name?: string | null;
+    updatedAt: string;
+  };
+
+  type ClientList = {
+    data: ClientItem[];
+    total: number;
+  };
 }

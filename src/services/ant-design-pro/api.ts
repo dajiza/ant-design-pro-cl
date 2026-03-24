@@ -102,3 +102,28 @@ export async function removeRule(options?: { [key: string]: any }) {
     },
   });
 }
+
+/** 获取客户列表 GET /api/v1/clients */
+export async function getClients(
+  params: {
+    page?: number;
+    limit?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.ClientList>('/api/v1/clients', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** 获取单个客户 GET /api/v1/clients/:id */
+export async function getClient(id: string, options?: { [key: string]: any }) {
+  return request<API.ClientItem>(`/api/v1/clients/${id}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}

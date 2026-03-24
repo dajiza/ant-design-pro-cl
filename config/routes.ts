@@ -57,6 +57,18 @@ export default [
     component: './table-list',
   },
   {
+    path: '/clients',
+    name: 'clients',
+    icon: 'team',
+    component: './clients',
+  },
+  {
+    path: '/kanban',
+    name: 'kanban',
+    icon: 'appstore',
+    component: './kanban',
+  },
+  {
     path: '/',
     redirect: '/welcome',
   },
