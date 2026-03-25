@@ -130,4 +130,90 @@ declare namespace API {
     data: ClientItem[];
     total: number;
   };
+
+  type StaffItem = {
+    id: string;
+    email: string;
+    name: string;
+    mobilePhone: string;
+    active: boolean;
+    displayName?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    avatar?: string | null;
+    suspended?: boolean | null;
+    nickname?: string | null;
+    role?: { name: string } | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  };
+
+  type StaffList = {
+    data: StaffItem[];
+    total: number;
+  };
+
+  type AppointmentItem = {
+    id: string;
+    startAt: string;
+    createdAt: string;
+    cancelled: boolean;
+    staffId: string;
+    clientId?: string | null;
+    locationId?: string | null;
+    endAt?: string | null;
+    duration?: number | null;
+    state?: string | null;
+    notes?: string | null;
+    clientMessage?: string | null;
+    bookedByType?: string | null;
+    isRecurring?: boolean | null;
+    isRemote?: boolean | null;
+    isGroupedAppointment?: boolean | null;
+    notifyClientCreate?: boolean | null;
+    notifyClientCancel?: boolean | null;
+    orderId?: string | null;
+    pendingFormCount?: number | null;
+    manageUrl?: string | null;
+    client?: Record<string, any> | null;
+    staff?: Record<string, any> | null;
+    location?: Record<string, any> | null;
+    appointmentServices?: Record<string, any>[] | null;
+  };
+
+  type AppointmentList = {
+    data: AppointmentItem[];
+    total: number;
+  };
+
+  type ServiceItem = {
+    id: string;
+    name: string;
+    active: boolean;
+    addon: boolean;
+    createdAt: string;
+    updatedAt: string;
+    defaultDuration: number;
+    defaultPrice: number;
+    locationId?: string | null;
+    categoryId?: string | null;
+    description?: string | null;
+  };
+
+  type ServiceList = {
+    data: ServiceItem[];
+    total: number;
+  };
+
+  type CreateAppointmentParams = {
+    id: string;
+    clientId: string;
+    staffId: string;
+    startAt: string;
+    createdAt: string;
+    cancelled: boolean;
+    duration?: number;
+    endAt?: string;
+    appointmentServices?: ServiceItem[];
+  };
 }

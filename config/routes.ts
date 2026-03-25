@@ -63,6 +63,28 @@ export default [
     component: './clients',
   },
   {
+    path: '/staff',
+    name: 'staff',
+    icon: 'team',
+    component: './staff',
+  },
+  {
+    path: '/appointments',
+    name: 'appointments',
+    icon: 'calendar',
+    routes: [
+      {
+        path: '/appointments',
+        component: './appointments',
+      },
+      {
+        path: '/appointments/new',
+        name: 'new-appointment',
+        component: './appointments/new',
+      },
+    ],
+  },
+  {
     path: '/kanban',
     name: 'kanban',
     icon: 'appstore',

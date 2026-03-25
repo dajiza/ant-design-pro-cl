@@ -127,3 +127,106 @@ export async function getClient(id: string, options?: { [key: string]: any }) {
     ...(options || {}),
   });
 }
+
+/** 获取员工列表 GET /api/v1/staff */
+export async function getStaff(
+  params: {
+    page?: number;
+    limit?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.StaffList>('/api/v1/staff', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** 获取单个员工 GET /api/v1/staff/:id */
+export async function getStaffMember(id: string, options?: { [key: string]: any }) {
+  return request<API.StaffItem>(`/api/v1/staff/${id}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 获取预约列表 GET /api/v1/appointments */
+export async function getAppointments(
+  params: {
+    page?: number;
+    limit?: number;
+    staffId?: string;
+    startDate?: string;
+    endDate?: string;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.AppointmentList>('/api/v1/appointments', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** 获取单个预约 GET /api/v1/appointments/:id */
+export async function getAppointment(id: string, options?: { [key: string]: any }) {
+  return request<API.AppointmentItem>(`/api/v1/appointments/${id}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 获取服务列表 GET /api/v1/services */
+export async function getServices(
+  params: {
+    page?: number;
+    limit?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.ServiceList>('/api/v1/services', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** 获取单个服务 GET /api/v1/services/:id */
+export async function getService(id: string, options?: { [key: string]: any }) {
+  return request<API.ServiceItem>(`/api/v1/services/${id}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 创建预约 POST /api/v1/appointments */
+export async function createAppointment(
+  body: {
+    id: string;
+    clientId: string;
+    staffId: string;
+    startAt: string;
+    createdAt: string;
+    cancelled: boolean;
+    duration?: number;
+    endAt?: string;
+    appointmentServices?: API.ServiceItem[];
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.AppointmentItem>('/api/v1/appointments', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
