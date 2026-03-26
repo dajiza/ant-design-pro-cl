@@ -175,8 +175,10 @@ declare namespace API {
     orderId?: string | null;
     pendingFormCount?: number | null;
     manageUrl?: string | null;
+    calComBookingId?: string | null;
+    roomId?: string | null;
+    equipmentId?: string | null;
     client?: Record<string, any> | null;
-    staff?: Record<string, any> | null;
     location?: Record<string, any> | null;
     appointmentServices?: Record<string, any>[] | null;
   };
@@ -206,14 +208,40 @@ declare namespace API {
   };
 
   type CreateAppointmentParams = {
-    id: string;
+    id?: string;
     clientId: string;
     staffId: string;
     startAt: string;
-    createdAt: string;
+    createdAt?: string;
     cancelled: boolean;
     duration?: number;
     endAt?: string;
     appointmentServices?: ServiceItem[];
+  };
+
+  type RoomItem = {
+    id: string;
+    name: string;
+    serviceId?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  type RoomList = {
+    data: RoomItem[];
+    total: number;
+  };
+
+  type EquipmentItem = {
+    id: string;
+    name: string;
+    serviceId?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  type EquipmentList = {
+    data: EquipmentItem[];
+    total: number;
   };
 }

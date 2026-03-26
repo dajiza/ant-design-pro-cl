@@ -212,14 +212,8 @@ const NewAppointment: React.FC = () => {
         cancelled: false,
         duration: selectedServiceInfo.defaultDuration * 60, // 转换为秒
         endAt: endAt.toISOString(),
-        appointmentServices: [
-          {
-            id: selectedServiceInfo.id,
-            name: selectedServiceInfo.name,
-            defaultDuration: selectedServiceInfo.defaultDuration,
-            defaultPrice: selectedServiceInfo.defaultPrice,
-          },
-        ],
+        // `appointmentServices` 需要的是完整的 `ServiceItem` 类型
+        appointmentServices: [selectedServiceInfo],
       });
       message.success('Appointment created successfully');
       navigate('/appointments');
@@ -259,11 +253,7 @@ const NewAppointment: React.FC = () => {
                 }
                 options={clientsData?.data?.map((c) => ({
                   value: c.id,
-                  label:
-                    c.name ||
-                    [c.firstName, c.lastName].filter(Boolean).join(' ') ||
-                    c.email ||
-                    c.id,
+                  label: c.name || c.email || c.id,
                 }))}
               />
               {selectedClientInfo && (
@@ -335,8 +325,7 @@ const NewAppointment: React.FC = () => {
                   ?.filter((s) => s.active)
                   .map((s) => ({
                     value: s.id,
-                    label:
-                      s.displayName || s.name || `${s.firstName} ${s.lastName}`,
+                    label: s.name,
                   }))}
               />
             </Card>
@@ -449,8 +438,7 @@ const NewAppointment: React.FC = () => {
                   <Text>
                     Appointment:{' '}
                     <strong>
-                      {selectedClientInfo.name || selectedClientInfo.firstName}{' '}
-                      - {selectedServiceInfo.name} at{' '}
+                      {selectedClientInfo.name} - {selectedServiceInfo.name} at{' '}
                       {dayjs(selectedSlot).format('MMM D, HH:mm')}
                     </strong>
                   </Text>

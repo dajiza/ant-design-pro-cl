@@ -159,6 +159,8 @@ export async function getAppointments(
     page?: number;
     limit?: number;
     staffId?: string;
+    roomId?: string;
+    equipmentId?: string;
     startDate?: string;
     endDate?: string;
   },
@@ -168,6 +170,24 @@ export async function getAppointments(
     method: 'GET',
     params: {
       ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** 获取预约日历数据 GET /api/v1/appointments (按日期范围获取所有预约) */
+export async function getAppointmentsByDateRange(
+  params: {
+    startDate: string;
+    endDate: string;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.AppointmentList>('/api/v1/appointments', {
+    method: 'GET',
+    params: {
+      startDate: params.startDate,
+      endDate: params.endDate,
     },
     ...(options || {}),
   });
@@ -209,14 +229,15 @@ export async function getService(id: string, options?: { [key: string]: any }) {
 /** 创建预约 POST /api/v1/appointments */
 export async function createAppointment(
   body: {
-    id: string;
+    id?: string;
     clientId: string;
     staffId: string;
     startAt: string;
-    createdAt: string;
     cancelled: boolean;
     duration?: number;
     endAt?: string;
+    roomId?: string | null;
+    equipmentId?: string | null;
     appointmentServices?: API.ServiceItem[];
   },
   options?: { [key: string]: any },
@@ -227,6 +248,188 @@ export async function createAppointment(
       'Content-Type': 'application/json',
     },
     data: body,
+    ...(options || {}),
+  });
+}
+
+/** 更新预约 PATCH /api/v1/appointments/:id */
+export async function updateAppointment(
+  id: string,
+  body: {
+    cancelled?: boolean;
+    startAt?: string;
+    endAt?: string;
+    staffId?: string;
+    roomId?: string | null;
+    equipmentId?: string | null;
+    notes?: string;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.AppointmentItem>(`/api/v1/appointments/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** 获取房间列表 GET /api/v1/rooms */
+export async function getRooms(
+  params: {
+    page?: number;
+    limit?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.RoomList>('/api/v1/rooms', {
+    method: 'GET',
+    params: {
+      page: params.page || 1,
+      limit: params.limit || 10,
+    },
+    ...(options || {}),
+  });
+}
+
+/** 获取单个房间 GET /api/v1/rooms/:id */
+export async function getRoom(id: string, options?: { [key: string]: any }) {
+  return request<API.RoomItem>(`/api/v1/rooms/${id}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 创建房间 POST /api/v1/rooms */
+export async function createRoom(
+  body: {
+    name: string;
+    serviceId?: string | null;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.RoomItem>('/api/v1/rooms', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** 更新房间 PATCH /api/v1/rooms/:id */
+export async function updateRoom(
+  id: string,
+  body: {
+    name?: string;
+    serviceId?: string | null;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.RoomItem>(`/api/v1/rooms/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** 删除房间 DELETE /api/v1/rooms/:id */
+export async function deleteRoom(id: string, options?: { [key: string]: any }) {
+  return request<void>(`/api/v1/rooms/${id}`, {
+    method: 'DELETE',
+    ...(options || {}),
+  });
+}
+
+/** 根据服务ID获取房间 GET /api/v1/rooms/service/:serviceId */
+export async function getRoomsByService(serviceId: string, options?: { [key: string]: any }) {
+  return request<API.RoomItem[]>(`/api/v1/rooms/service/${serviceId}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 获取设备列表 GET /api/v1/equipment */
+export async function getEquipment(
+  params: {
+    page?: number;
+    limit?: number;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.EquipmentList>('/api/v1/equipment', {
+    method: 'GET',
+    params: {
+      page: params.page || 1,
+      limit: params.limit || 10,
+    },
+    ...(options || {}),
+  });
+}
+
+/** 获取单个设备 GET /api/v1/equipment/:id */
+export async function getEquipmentItem(id: string, options?: { [key: string]: any }) {
+  return request<API.EquipmentItem>(`/api/v1/equipment/${id}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 创建设备 POST /api/v1/equipment */
+export async function createEquipment(
+  body: {
+    name: string;
+    serviceId?: string | null;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.EquipmentItem>('/api/v1/equipment', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** 更新设备 PATCH /api/v1/equipment/:id */
+export async function updateEquipment(
+  id: string,
+  body: {
+    name?: string;
+    serviceId?: string | null;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.EquipmentItem>(`/api/v1/equipment/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** 删除设备 DELETE /api/v1/equipment/:id */
+export async function deleteEquipment(id: string, options?: { [key: string]: any }) {
+  return request<void>(`/api/v1/equipment/${id}`, {
+    method: 'DELETE',
+    ...(options || {}),
+  });
+}
+
+/** 根据服务ID获取设备 GET /api/v1/equipment/service/:serviceId */
+export async function getEquipmentByService(serviceId: string, options?: { [key: string]: any }) {
+  return request<API.EquipmentItem[]>(`/api/v1/equipment/service/${serviceId}`, {
+    method: 'GET',
     ...(options || {}),
   });
 }

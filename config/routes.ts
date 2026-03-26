@@ -69,6 +69,18 @@ export default [
     component: './staff',
   },
   {
+    path: '/rooms',
+    name: 'rooms',
+    icon: 'home',
+    component: './rooms',
+  },
+  {
+    path: '/equipment',
+    name: 'equipment',
+    icon: 'tool',
+    component: './equipment',
+  },
+  {
     path: '/appointments',
     name: 'appointments',
     icon: 'calendar',
@@ -76,6 +88,11 @@ export default [
       {
         path: '/appointments',
         component: './appointments',
+      },
+      {
+        path: '/appointments/calendar',
+        name: 'calendar',
+        component: './appointments/calendar',
       },
       {
         path: '/appointments/new',

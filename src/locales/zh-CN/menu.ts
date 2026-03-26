@@ -51,4 +51,8 @@ export default {
   'menu.editor.koni': '拓扑编辑器',
   'menu.clients': '客户管理',
   'menu.kanban': '任务看板',
+  'menu.appointments': '预约管理',
+  'menu.appointments.calendar': '日历视图',
+  'menu.rooms': '房间管理',
+  'menu.equipment': '设备管理',
 };
