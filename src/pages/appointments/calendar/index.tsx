@@ -8,6 +8,8 @@ import type {
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
+import type {} from '@fullcalendar/resource'; // Import for type augmentation
+import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import { useIntl } from '@umijs/max';
 import {
@@ -64,6 +66,39 @@ const useStyles = createStyles(({ token }) => ({
       '--fc-neutral-bg-color': token.colorBgLayout,
       '--fc-page-bg-color': token.colorBgContainer,
       '--fc-highlight-color': token.colorPrimaryBg,
+      // Resource column header styles
+      '.fc-col-header-cell-cushion': {
+        fontSize: 11,
+        fontWeight: 500,
+      },
+      '.fc-scrollgrid-sync-inner': {
+        fontSize: 11,
+      },
+      // Resource name in column header
+      '.fc-timegrid-axis': {
+        fontSize: 11,
+      },
+      '.fc-col-header-cell': {
+        fontSize: 11,
+        '.fc-col-header-cell-cushion': {
+          fontSize: 11,
+          wordBreak: 'break-all',
+        },
+      },
+      '.fc-datagrid-cell': {
+        '.fc-datagrid-cell-main': {
+          fontSize: 11,
+          fontWeight: 500,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        },
+      },
+      // Resource title in header
+      '.fc-resource': {
+        fontSize: 11,
+        fontWeight: 500,
+      },
     },
   },
   loadingContainer: {
@@ -197,6 +232,11 @@ const AppointmentCalendar: React.FC = () => {
   const [currentStart, setCurrentStart] = useState<string | null>(null);
   const [currentEnd, setCurrentEnd] = useState<string | null>(null);
 
+  // Resource type for column view: 'none' | 'room' | 'staff' | 'equipment'
+  const [resourceType, setResourceType] = useState<
+    'none' | 'room' | 'staff' | 'equipment'
+  >('room');
+
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
@@ -242,6 +282,52 @@ const AppointmentCalendar: React.FC = () => {
   const [equipmentAppointments, setEquipmentAppointments] = useState<
     API.AppointmentItem[]
   >([]);
+
+  // Resources for calendar columns based on resourceType
+  const calendarResources = useMemo(() => {
+    switch (resourceType) {
+      case 'none':
+        return []; // No resource columns
+      case 'staff':
+        return staffList.map((staff) => ({
+          id: staff.id,
+          title:
+            staff.displayName ||
+            staff.name ||
+            `${staff.firstName || ''} ${staff.lastName || ''}`.trim() ||
+            staff.email,
+        }));
+      case 'equipment':
+        return allEquipment.map((eq) => ({
+          id: eq.id,
+          title: eq.name,
+        }));
+      case 'room':
+      default:
+        return allRooms.map((room) => ({
+          id: room.id,
+          title: room.name,
+        }));
+    }
+  }, [resourceType, staffList, allEquipment, allRooms]);
+
+  // Get resource ID from appointment based on resourceType
+  const getResourceIdFromAppointment = useCallback(
+    (appointment: API.AppointmentItem) => {
+      switch (resourceType) {
+        case 'none':
+          return undefined;
+        case 'staff':
+          return appointment.staffId;
+        case 'equipment':
+          return appointment.equipmentId || undefined;
+        case 'room':
+        default:
+          return appointment.roomId || undefined;
+      }
+    },
+    [resourceType],
+  );
 
   // Fetch staff list
   const fetchStaffList = async () => {
@@ -329,6 +415,7 @@ const AppointmentCalendar: React.FC = () => {
             ).toISOString(),
           backgroundColor: appointment.cancelled ? '#ff4d4f' : undefined,
           borderColor: appointment.cancelled ? '#ff4d4f' : undefined,
+          resourceId: getResourceIdFromAppointment(appointment),
           extendedProps: {
             appointment,
           },
@@ -354,7 +441,7 @@ const AppointmentCalendar: React.FC = () => {
     init();
   }, []);
 
-  // Reload appointments when filters change
+  // Reload appointments when filters or resourceType change
   useEffect(() => {
     if (currentStart && currentEnd) {
       setLoading(true);
@@ -362,7 +449,12 @@ const AppointmentCalendar: React.FC = () => {
         setLoading(false),
       );
     }
-  }, [selectedStaffId, selectedRoomFilter, selectedEquipmentFilter]);
+  }, [
+    selectedStaffId,
+    selectedRoomFilter,
+    selectedEquipmentFilter,
+    resourceType,
+  ]);
 
   // Handle dates change (navigation)
   const handleDatesSet = useCallback(
@@ -383,10 +475,15 @@ const AppointmentCalendar: React.FC = () => {
 
   // Handle event drag and drop
   const handleEventDrop = async (arg: EventDropArg) => {
-    const { event, revert } = arg;
+    const { event, revert, newResource, oldResource } = arg;
     const appointmentId = event.id;
     const newStart = event.start?.toISOString();
     const newEnd = event.end?.toISOString();
+
+    // Get the new resource from event.getResources() as fallback
+    const resources = event.getResources();
+    const newResourceId = newResource?.id || resources[0]?.id || null;
+    const oldResourceId = oldResource?.id;
 
     // Get appointment info for confirmation
     const appointment = event.extendedProps.appointment as
@@ -399,6 +496,269 @@ const AppointmentCalendar: React.FC = () => {
         .join(' ') ||
       'Client';
 
+    // Get the new time range
+    const newStartDate = newStart ? new Date(newStart) : null;
+    const newEndDate = newEnd
+      ? new Date(newEnd)
+      : newStartDate
+        ? new Date(
+            newStartDate.getTime() + (appointment?.duration || 3600) * 1000,
+          )
+        : null;
+
+    // Check for conflicts with existing appointments
+    const checkConflicts = (): {
+      hasConflict: boolean;
+      conflictType: string;
+      conflictDetails: string;
+    } => {
+      if (!newStartDate || !newEndDate) {
+        return { hasConflict: false, conflictType: '', conflictDetails: '' };
+      }
+
+      // Get all events from the calendar (excluding the current one being dragged)
+      const otherEvents = events.filter((e) => e.id !== appointmentId);
+
+      // Check based on resource type
+      const conflicts: string[] = [];
+
+      // Staff overlap check: allow 30 minutes overlap at start and end
+      const STAFF_OVERLAP_BUFFER = 30 * 60 * 1000; // 30 minutes in milliseconds
+
+      const isStaffTimeOverlapping = (
+        start1: Date,
+        end1: Date,
+        start2: Date,
+        end2: Date,
+      ): boolean => {
+        // For staff, shrink the new appointment time by 30 minutes on each side
+        // This allows 30 minutes overlap at the beginning and end
+        const adjustedStart1 = new Date(
+          start1.getTime() + STAFF_OVERLAP_BUFFER,
+        );
+        const adjustedEnd1 = new Date(end1.getTime() - STAFF_OVERLAP_BUFFER);
+        // If the appointment is shorter than 60 minutes, no overlap is allowed
+        if (adjustedEnd1 <= adjustedStart1) {
+          return isTimeOverlapping(start1, end1, start2, end2);
+        }
+        return isTimeOverlapping(adjustedStart1, adjustedEnd1, start2, end2);
+      };
+
+      // 1. Check current resource type (the columns being displayed)
+      if (newResourceId) {
+        const sameResourceEvents = otherEvents.filter(
+          (e) => e.resourceId === newResourceId,
+        );
+        const overlapCheck =
+          resourceType === 'staff' ? isStaffTimeOverlapping : isTimeOverlapping;
+        const hasConflict = sameResourceEvents.some((e) => {
+          const eStart = new Date(e.start);
+          const eEnd = new Date(e.end);
+          return overlapCheck(newStartDate, newEndDate, eStart, eEnd);
+        });
+        if (hasConflict) {
+          const resourceLabel =
+            resourceType === 'staff'
+              ? 'Staff'
+              : resourceType === 'equipment'
+                ? 'Equipment'
+                : 'Room';
+          conflicts.push(resourceLabel);
+        }
+      }
+
+      // 2. Also check other resource types if the appointment has them
+      // Check staff conflict (if not already checked and appointment has staffId)
+      if (resourceType !== 'staff' && appointment?.staffId) {
+        const staffEvents = otherEvents.filter((e) => {
+          const apt = e.extendedProps?.appointment as
+            | API.AppointmentItem
+            | undefined;
+          return apt?.staffId === appointment.staffId;
+        });
+        const hasConflict = staffEvents.some((e) => {
+          const eStart = new Date(e.start);
+          const eEnd = new Date(e.end);
+          return isStaffTimeOverlapping(newStartDate, newEndDate, eStart, eEnd);
+        });
+        if (hasConflict) conflicts.push('Staff');
+      }
+
+      // Check room conflict (if not already checked and appointment has roomId)
+      if (resourceType !== 'room' && appointment?.roomId) {
+        const roomEvents = otherEvents.filter((e) => {
+          const apt = e.extendedProps?.appointment as
+            | API.AppointmentItem
+            | undefined;
+          return apt?.roomId === appointment.roomId;
+        });
+        const hasConflict = roomEvents.some((e) => {
+          const eStart = new Date(e.start);
+          const eEnd = new Date(e.end);
+          return isTimeOverlapping(newStartDate, newEndDate, eStart, eEnd);
+        });
+        if (hasConflict) conflicts.push('Room');
+      }
+
+      // Check equipment conflict (if not already checked and appointment has equipmentId)
+      if (resourceType !== 'equipment' && appointment?.equipmentId) {
+        const equipmentEvents = otherEvents.filter((e) => {
+          const apt = e.extendedProps?.appointment as
+            | API.AppointmentItem
+            | undefined;
+          return apt?.equipmentId === appointment.equipmentId;
+        });
+        const hasConflict = equipmentEvents.some((e) => {
+          const eStart = new Date(e.start);
+          const eEnd = new Date(e.end);
+          return isTimeOverlapping(newStartDate, newEndDate, eStart, eEnd);
+        });
+        if (hasConflict) conflicts.push('Equipment');
+      }
+
+      // 3. If dragging to a new resource, check if that resource is available
+      if (
+        resourceType === 'staff' &&
+        newResourceId &&
+        newResourceId !== appointment?.staffId
+      ) {
+        // Check if the new staff has any appointments at this time
+        const staffEvents = otherEvents.filter((e) => {
+          const apt = e.extendedProps?.appointment as
+            | API.AppointmentItem
+            | undefined;
+          return apt?.staffId === newResourceId;
+        });
+        const hasConflict = staffEvents.some((e) => {
+          const eStart = new Date(e.start);
+          const eEnd = new Date(e.end);
+          return isStaffTimeOverlapping(newStartDate, newEndDate, eStart, eEnd);
+        });
+        if (hasConflict && !conflicts.includes('Staff'))
+          conflicts.push('Staff (new)');
+      }
+
+      if (
+        resourceType === 'room' &&
+        newResourceId &&
+        newResourceId !== appointment?.roomId
+      ) {
+        const roomEvents = otherEvents.filter((e) => {
+          const apt = e.extendedProps?.appointment as
+            | API.AppointmentItem
+            | undefined;
+          return apt?.roomId === newResourceId;
+        });
+        const hasConflict = roomEvents.some((e) => {
+          const eStart = new Date(e.start);
+          const eEnd = new Date(e.end);
+          return isTimeOverlapping(newStartDate, newEndDate, eStart, eEnd);
+        });
+        if (hasConflict && !conflicts.includes('Room'))
+          conflicts.push('Room (new)');
+      }
+
+      if (
+        resourceType === 'equipment' &&
+        newResourceId &&
+        newResourceId !== appointment?.equipmentId
+      ) {
+        const equipmentEvents = otherEvents.filter((e) => {
+          const apt = e.extendedProps?.appointment as
+            | API.AppointmentItem
+            | undefined;
+          return apt?.equipmentId === newResourceId;
+        });
+        const hasConflict = equipmentEvents.some((e) => {
+          const eStart = new Date(e.start);
+          const eEnd = new Date(e.end);
+          return isTimeOverlapping(newStartDate, newEndDate, eStart, eEnd);
+        });
+        if (hasConflict && !conflicts.includes('Equipment'))
+          conflicts.push('Equipment (new)');
+      }
+
+      return {
+        hasConflict: conflicts.length > 0,
+        conflictType: conflicts.join(', '),
+        conflictDetails: `Conflicts with existing appointments in: ${conflicts.join(', ')}`,
+      };
+    };
+
+    // Check for conflicts first
+    const conflictResult = checkConflicts();
+
+    if (conflictResult.hasConflict) {
+      message.error(
+        intl.formatMessage(
+          {
+            id: 'calendar.moveConflict',
+            defaultMessage: 'Cannot move appointment: {conflict}',
+          },
+          { conflict: conflictResult.conflictDetails },
+        ),
+      );
+      revert();
+      return;
+    }
+
+    // Get resource names based on type
+    const getResourceName = (resourceId: string | null | undefined) => {
+      if (!resourceId) return '-';
+      switch (resourceType) {
+        case 'staff': {
+          const staff = staffList.find((s) => s.id === resourceId);
+          return (
+            staff?.displayName ||
+            staff?.name ||
+            `${staff?.firstName || ''} ${staff?.lastName || ''}`.trim() ||
+            '-'
+          );
+        }
+        case 'equipment':
+          return allEquipment.find((e) => e.id === resourceId)?.name || '-';
+        case 'room':
+        default:
+          return allRooms.find((r) => r.id === resourceId)?.name || '-';
+      }
+    };
+
+    const oldResourceName =
+      getResourceName(oldResourceId) ||
+      getResourceName(
+        resourceType === 'staff'
+          ? appointment?.staffId
+          : resourceType === 'equipment'
+            ? appointment?.equipmentId
+            : appointment?.roomId,
+      );
+    const newResourceName = getResourceName(newResourceId);
+
+    // Build update payload based on resource type
+    const getUpdatePayload = () => {
+      const base = {
+        startAt: newStart,
+        endAt: newEnd,
+      };
+      switch (resourceType) {
+        case 'staff':
+          return { ...base, staffId: newResourceId };
+        case 'equipment':
+          return { ...base, equipmentId: newResourceId };
+        case 'room':
+        default:
+          return { ...base, roomId: newResourceId };
+      }
+    };
+
+    // Get resource type label
+    const resourceTypeLabel =
+      resourceType === 'staff'
+        ? 'Staff'
+        : resourceType === 'equipment'
+          ? 'Equipment'
+          : 'Room';
+
     // Show confirmation modal
     Modal.confirm({
       title: intl.formatMessage({
@@ -407,13 +767,17 @@ const AppointmentCalendar: React.FC = () => {
       }),
       content: intl.formatMessage(
         {
-          id: 'calendar.moveConfirm.content',
-          defaultMessage: 'Move appointment for {client} to {date} at {time}?',
+          id: 'calendar.moveConfirm.contentWithResource',
+          defaultMessage:
+            'Move appointment for {client} to {date} at {time}?\n{resourceType}: {oldResource} → {newResource}',
         },
         {
           client: clientName,
           date: dayjs(newStart).format('YYYY-MM-DD'),
           time: dayjs(newStart).format('HH:mm'),
+          resourceType: resourceTypeLabel,
+          oldResource: oldResourceName,
+          newResource: newResourceName,
         },
       ),
       okText: intl.formatMessage({
@@ -426,10 +790,7 @@ const AppointmentCalendar: React.FC = () => {
       }),
       onOk: async () => {
         try {
-          await updateAppointment(appointmentId, {
-            startAt: newStart,
-            endAt: newEnd,
-          });
+          await updateAppointment(appointmentId, getUpdatePayload());
           message.success(
             intl.formatMessage({
               id: 'calendar.moveSuccess',
@@ -797,6 +1158,50 @@ const AppointmentCalendar: React.FC = () => {
           <Space>
             <span>
               {intl.formatMessage({
+                id: 'calendar.viewBy',
+                defaultMessage: 'View by',
+              })}
+              :
+            </span>
+            <Select
+              style={{ width: 120 }}
+              value={resourceType}
+              onChange={setResourceType}
+              options={[
+                {
+                  value: 'none',
+                  label: intl.formatMessage({
+                    id: 'calendar.viewByNone',
+                    defaultMessage: 'None',
+                  }),
+                },
+                {
+                  value: 'room',
+                  label: intl.formatMessage({
+                    id: 'calendar.viewByRoom',
+                    defaultMessage: 'Room',
+                  }),
+                },
+                {
+                  value: 'staff',
+                  label: intl.formatMessage({
+                    id: 'calendar.viewByStaff',
+                    defaultMessage: 'Staff',
+                  }),
+                },
+                {
+                  value: 'equipment',
+                  label: intl.formatMessage({
+                    id: 'calendar.viewByEquipment',
+                    defaultMessage: 'Equipment',
+                  }),
+                },
+              ]}
+            />
+          </Space>
+          <Space>
+            <span>
+              {intl.formatMessage({
                 id: 'calendar.filter.staff',
                 defaultMessage: 'Staff',
               })}
@@ -872,13 +1277,31 @@ const AppointmentCalendar: React.FC = () => {
       <div className={styles.calendarContainer}>
         <FullCalendar
           ref={calendarRef}
-          plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
-          initialView="timeGridWeek"
-          headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'timeGridDay,timeGridWeek,dayGridMonth',
-          }}
+          key={resourceType} // Force re-render when resourceType changes
+          plugins={
+            resourceType === 'none'
+              ? [timeGridPlugin, dayGridPlugin, interactionPlugin]
+              : [resourceTimeGridPlugin, dayGridPlugin, interactionPlugin]
+          }
+          initialView={
+            resourceType === 'none' ? 'timeGridWeek' : 'resourceTimeGridWeek'
+          }
+          datesAboveResources={resourceType !== 'none'}
+          resources={resourceType === 'none' ? undefined : calendarResources}
+          headerToolbar={
+            resourceType === 'none'
+              ? {
+                  left: 'prev,next today',
+                  center: 'title',
+                  right: 'timeGridDay,timeGridWeek,dayGridMonth',
+                }
+              : {
+                  left: 'prev,next today',
+                  center: 'title',
+                  right:
+                    'resourceTimeGridDay,resourceTimeGridWeek,dayGridMonth',
+                }
+          }
           events={events}
           datesSet={handleDatesSet}
           eventDrop={handleEventDrop}
