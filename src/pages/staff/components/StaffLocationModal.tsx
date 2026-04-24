@@ -1,5 +1,5 @@
+import { Form, Modal, Select } from 'antd';
 import React from 'react';
-import { Modal, Form, Select } from 'antd';
 
 interface StaffLocationModalProps {
   open: boolean;
@@ -36,7 +36,10 @@ const StaffLocationModal: React.FC<StaffLocationModalProps> = ({
         <Form.Item name="locationId" label="门店" rules={[{ required: true }]}>
           <Select
             placeholder="选择门店"
-            options={locations.map((l) => ({ value: l.id, label: l.name || l.id }))}
+            options={locations.map((l) => ({
+              value: l.id,
+              label: l.name || l.id,
+            }))}
           />
         </Form.Item>
         <Form.Item name="active" label="操作">

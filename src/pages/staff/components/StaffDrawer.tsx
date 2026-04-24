@@ -1,20 +1,23 @@
+import { EditOutlined, EnvironmentOutlined } from '@ant-design/icons';
+import {
+  Avatar,
+  Button,
+  Descriptions,
+  Divider,
+  Drawer,
+  message,
+  Space,
+  Tag,
+  Typography,
+} from 'antd';
+import dayjs from 'dayjs';
 import React, { useState } from 'react';
 import {
-  Drawer,
-  Descriptions,
-  Tag,
-  Button,
-  Space,
-  Divider,
-  Typography,
-  Avatar,
-  message,
-} from 'antd';
-import { EditOutlined, EnvironmentOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
+  updateStaff,
+  updateStaffLocation,
+} from '@/services/ant-design-pro/api';
 import StaffFormModal from './StaffFormModal';
 import StaffLocationModal from './StaffLocationModal';
-import { updateStaff, updateStaffLocation } from '@/services/ant-design-pro/api';
 
 const { Text } = Typography;
 
@@ -55,7 +58,10 @@ const StaffDrawer: React.FC<StaffDrawerProps> = ({
     }
   };
 
-  const handleLocation = async (values: { locationId: string; active: boolean }) => {
+  const handleLocation = async (values: {
+    locationId: string;
+    active: boolean;
+  }) => {
     setLoading(true);
     try {
       await updateStaffLocation(staff.id, values);
@@ -84,12 +90,24 @@ const StaffDrawer: React.FC<StaffDrawerProps> = ({
         </div>
 
         <Descriptions column={2} size="small">
-          <Descriptions.Item label="姓名">{staff.name || '-'}</Descriptions.Item>
-          <Descriptions.Item label="显示名">{staff.displayName || '-'}</Descriptions.Item>
-          <Descriptions.Item label="邮箱">{staff.email || '-'}</Descriptions.Item>
-          <Descriptions.Item label="手机">{staff.mobilePhone || '-'}</Descriptions.Item>
-          <Descriptions.Item label="角色">{staff.role?.name || '-'}</Descriptions.Item>
-          <Descriptions.Item label="昵称">{staff.nickname || '-'}</Descriptions.Item>
+          <Descriptions.Item label="姓名">
+            {staff.name || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label="显示名">
+            {staff.displayName || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label="邮箱">
+            {staff.email || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label="手机">
+            {staff.mobilePhone || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label="角色">
+            {staff.role?.name || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label="昵称">
+            {staff.nickname || '-'}
+          </Descriptions.Item>
           <Descriptions.Item label="状态">
             <Tag color={staff.active ? 'green' : 'red'}>
               {staff.active ? '活跃' : '未激活'}
@@ -124,7 +142,10 @@ const StaffDrawer: React.FC<StaffDrawerProps> = ({
 
         <Divider>操作</Divider>
         <Space>
-          <Button icon={<EditOutlined />} onClick={() => setEditModalOpen(true)}>
+          <Button
+            icon={<EditOutlined />}
+            onClick={() => setEditModalOpen(true)}
+          >
             编辑
           </Button>
           <Button
