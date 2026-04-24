@@ -57,16 +57,45 @@ export default [
     component: './table-list',
   },
   {
-    path: '/clients',
-    name: 'clients',
-    icon: 'team',
-    component: './clients',
-  },
-  {
-    path: '/staff',
-    name: 'staff',
-    icon: 'team',
-    component: './staff',
+    path: '/sync-data',
+    name: 'sync-data',
+    icon: 'cloudServer',
+    routes: [
+      {
+        path: '/sync-data/business',
+        name: 'sync-business',
+        component: './sync-data/business',
+      },
+      {
+        path: '/sync-data/client',
+        name: 'sync-client',
+        component: './sync-data/client',
+      },
+      {
+        path: '/sync-data/location',
+        name: 'sync-location',
+        component: './sync-data/location',
+      },
+      {
+        path: '/sync-data/service',
+        name: 'sync-service',
+        component: './sync-data/service',
+      },
+      {
+        path: '/sync-data/service-category',
+        name: 'sync-service-category',
+        component: './sync-data/service-category',
+      },
+      {
+        path: '/sync-data/staff',
+        name: 'sync-staff',
+        component: './sync-data/staff',
+      },
+      {
+        path: '/sync-data',
+        redirect: '/sync-data/business',
+      },
+    ],
   },
   {
     path: '/rooms',
@@ -87,6 +116,7 @@ export default [
     routes: [
       {
         path: '/appointments',
+        name: 'appointments',
         component: './appointments',
       },
       {
