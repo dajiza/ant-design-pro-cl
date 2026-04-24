@@ -124,7 +124,10 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
   }) => {
     setLoading(true);
     try {
-      await cancelAppointment(appointment?.id, values);
+      await cancelAppointment(appointment?.id, {
+        ...values,
+        reason: values.reason as API.CancellationReason,
+      });
       message.success('预约已取消');
       setCancelModalOpen(false);
       onRefresh();
@@ -240,8 +243,8 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
           <Space>
             <span>预约详情</span>
             <AppointmentStateBadge
-              state={appointment.state}
-              cancelled={appointment.cancelled}
+              state={appointment.state ?? undefined}
+              cancelled={appointment.cancelled ?? undefined}
             />
           </Space>
         }

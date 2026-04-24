@@ -308,13 +308,14 @@ const AppointmentCalendar: React.FC = () => {
           s.displayName ||
           s.name ||
           `${s.firstName || ''} ${s.lastName || ''}`.trim() ||
-          s.email,
+          s.email ||
+          '',
       })),
     [staffList],
   );
 
   const apt = selectedAppointment;
-  const next = apt ? getNextState(apt.state) : null;
+  const next = apt ? getNextState(apt.state ?? undefined) : null;
   const canAct = apt && !apt.cancelled && apt.state !== 'FINAL';
 
   return (
@@ -417,8 +418,8 @@ const AppointmentCalendar: React.FC = () => {
             预约详情
             {apt && (
               <AppointmentStateBadge
-                state={apt.state}
-                cancelled={apt.cancelled}
+                state={apt.state ?? undefined}
+                cancelled={apt.cancelled ?? undefined}
               />
             )}
           </Space>
