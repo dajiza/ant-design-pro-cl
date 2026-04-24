@@ -1,44 +1,43 @@
-import React, { useState } from 'react';
-import {
-  Drawer,
-  Descriptions,
-  Tag,
-  Button,
-  Space,
-  Divider,
-  Input,
-  Popconfirm,
-  Typography,
-  message,
-} from 'antd';
 import {
   CheckCircleOutlined,
+  CloseCircleOutlined,
+  DeleteOutlined,
+  DollarOutlined,
   LoginOutlined,
   PlayCircleOutlined,
-  DollarOutlined,
-  CloseCircleOutlined,
-  UndoOutlined,
-  ScheduleOutlined,
-  DeleteOutlined,
   PlusOutlined,
   RocketOutlined,
+  ScheduleOutlined,
+  UndoOutlined,
 } from '@ant-design/icons';
+import {
+  Button,
+  Descriptions,
+  Divider,
+  Drawer,
+  Input,
+  message,
+  Popconfirm,
+  Space,
+  Tag,
+  Typography,
+} from 'antd';
 import dayjs from 'dayjs';
+import React, { useState } from 'react';
+import {
+  addAppointmentTags,
+  cancelAppointment,
+  createBookingFromAppointment,
+  deleteAppointment,
+  removeAppointmentTags,
+  rescheduleAppointment,
+  restoreAppointment,
+  setAppointmentNote,
+  updateAppointmentState,
+} from '@/services/ant-design-pro/api';
 import AppointmentStateBadge from './AppointmentStateBadge';
 import CancelModal from './CancelModal';
 import RescheduleModal from './RescheduleModal';
-import {
-  updateAppointmentState,
-  cancelAppointment,
-  restoreAppointment,
-  rescheduleAppointment,
-  setAppointmentNote,
-  addAppointmentTags,
-  removeAppointmentTags,
-  createBookingFromAppointment,
-  deleteAppointment,
-  updateAppointment,
-} from '@/services/ant-design-pro/api';
 
 const { Text, Link } = Typography;
 
@@ -68,23 +67,38 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
     appointment.client?.name ||
     `${(appointment.client as any)?.firstName || ''} ${(appointment.client as any)?.lastName || ''}`.trim() ||
     '未知客户';
-  const locationName = (appointment.location as any)?.name || appointment.locationId || '-';
+  const locationName =
+    (appointment.location as any)?.name || appointment.locationId || '-';
   const locationTz = (appointment.location as any)?.tz || 'UTC';
   const startTime = dayjs(appointment.startAt).format('YYYY-MM-DD HH:mm');
-  const endTime = appointment.endAt ? dayjs(appointment.endAt).format('HH:mm') : '-';
-  const durationMinutes = appointment.duration ? Math.round(appointment.duration / 60) : '-';
+  const endTime = appointment.endAt
+    ? dayjs(appointment.endAt).format('HH:mm')
+    : '-';
+  const durationMinutes = appointment.duration
+    ? Math.round(appointment.duration / 60)
+    : '-';
   const canAct = !appointment.cancelled && appointment.state !== 'FINAL';
 
-  const getNextStates = (): { state: string; label: string; icon: React.ReactNode }[] => {
+  const getNextStates = (): {
+    state: string;
+    label: string;
+    icon: React.ReactNode;
+  }[] => {
     switch (appointment.state) {
       case 'BOOKED':
-        return [{ state: 'CONFIRMED', label: '确认', icon: <CheckCircleOutlined /> }];
+        return [
+          { state: 'CONFIRMED', label: '确认', icon: <CheckCircleOutlined /> },
+        ];
       case 'CONFIRMED':
         return [{ state: 'ARRIVED', label: '已到达', icon: <LoginOutlined /> }];
       case 'ARRIVED':
-        return [{ state: 'ACTIVE', label: '开始服务', icon: <PlayCircleOutlined /> }];
+        return [
+          { state: 'ACTIVE', label: '开始服务', icon: <PlayCircleOutlined /> },
+        ];
       case 'ACTIVE':
-        return [{ state: 'FINAL', label: '完成结账', icon: <DollarOutlined /> }];
+        return [
+          { state: 'FINAL', label: '完成结账', icon: <DollarOutlined /> },
+        ];
       default:
         return [];
     }
@@ -93,7 +107,7 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
   const handleStateChange = async (state: string) => {
     setLoading(true);
     try {
-      await updateAppointmentState(appointment!.id, state as any);
+      await updateAppointmentState(appointment?.id, state as any);
       message.success('状态更新成功');
       onRefresh();
     } catch (error: any) {
@@ -103,10 +117,14 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
     }
   };
 
-  const handleCancel = async (values: { reason: string; notes?: string; notifyClient: boolean }) => {
+  const handleCancel = async (values: {
+    reason: string;
+    notes?: string;
+    notifyClient: boolean;
+  }) => {
     setLoading(true);
     try {
-      await cancelAppointment(appointment!.id, values);
+      await cancelAppointment(appointment?.id, values);
       message.success('预约已取消');
       setCancelModalOpen(false);
       onRefresh();
@@ -120,7 +138,7 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
   const handleRestore = async () => {
     setLoading(true);
     try {
-      await restoreAppointment(appointment!.id);
+      await restoreAppointment(appointment?.id);
       message.success('预约已恢复');
       onRefresh();
     } catch (error: any) {
@@ -133,7 +151,7 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
   const handleReschedule = async (startAt: string) => {
     setLoading(true);
     try {
-      await rescheduleAppointment(appointment!.id, { startAt });
+      await rescheduleAppointment(appointment?.id, { startAt });
       message.success('预约已改期');
       setRescheduleModalOpen(false);
       onRefresh();
@@ -147,7 +165,7 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
   const handleSaveNote = async () => {
     setLoading(true);
     try {
-      await setAppointmentNote(appointment!.id, { note: editNote });
+      await setAppointmentNote(appointment?.id, { note: editNote });
       message.success('备注已保存');
       setShowNoteEdit(false);
       onRefresh();
@@ -162,7 +180,7 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
     if (!tagInput.trim()) return;
     setLoading(true);
     try {
-      await addAppointmentTags(appointment!.id, { tagIds: [tagInput.trim()] });
+      await addAppointmentTags(appointment?.id, { tagIds: [tagInput.trim()] });
       message.success('标签已添加');
       setTagInput('');
       onRefresh();
@@ -176,7 +194,7 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
   const handleRemoveTag = async (tagId: string) => {
     setLoading(true);
     try {
-      await removeAppointmentTags(appointment!.id, { tagIds: [tagId] });
+      await removeAppointmentTags(appointment?.id, { tagIds: [tagId] });
       message.success('标签已移除');
       onRefresh();
     } catch (error: any) {
@@ -189,7 +207,7 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await deleteAppointment(appointment!.id);
+      await deleteAppointment(appointment?.id);
       message.success('预约已删除');
       onClose();
       onRefresh();
@@ -203,7 +221,7 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
   const handleCreateBooking = async () => {
     setLoading(true);
     try {
-      await createBookingFromAppointment(appointment!.id);
+      await createBookingFromAppointment(appointment?.id);
       message.success('Booking 已创建');
       onRefresh();
     } catch (error: any) {
@@ -221,7 +239,10 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
         title={
           <Space>
             <span>预约详情</span>
-            <AppointmentStateBadge state={appointment.state} cancelled={appointment.cancelled} />
+            <AppointmentStateBadge
+              state={appointment.state}
+              cancelled={appointment.cancelled}
+            />
           </Space>
         }
         open={open}
@@ -237,30 +258,42 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
             {durationMinutes} 分钟
           </Descriptions.Item>
           <Descriptions.Item label="时区">{locationTz}</Descriptions.Item>
-          <Descriptions.Item label="来源">{appointment.bookedByType || '-'}</Descriptions.Item>
+          <Descriptions.Item label="来源">
+            {appointment.bookedByType || '-'}
+          </Descriptions.Item>
           {appointment.orderId && (
-            <Descriptions.Item label="订单">{appointment.orderId}</Descriptions.Item>
+            <Descriptions.Item label="订单">
+              {appointment.orderId}
+            </Descriptions.Item>
           )}
         </Descriptions>
 
-        {appointment.appointmentServices && (appointment.appointmentServices as any[]).length > 0 && (
-          <>
-            <Divider>服务列表</Divider>
-            {(appointment.appointmentServices as any[]).map((svc: any, i: number) => (
-              <Descriptions key={i} column={3} size="small" style={{ marginBottom: 8 }}>
-                <Descriptions.Item label="服务">
-                  {svc.name || svc.serviceName || svc.serviceId}
-                </Descriptions.Item>
-                <Descriptions.Item label="时长">
-                  {svc.duration || svc.totalDuration || '-'} 分钟
-                </Descriptions.Item>
-                <Descriptions.Item label="价格">
-                  {svc.price ? `$${(svc.price.amount / 100).toFixed(2)}` : '-'}
-                </Descriptions.Item>
-              </Descriptions>
-            ))}
-          </>
-        )}
+        {appointment.appointmentServices &&
+          (appointment.appointmentServices as any[]).length > 0 && (
+            <>
+              <Divider>服务列表</Divider>
+              {(appointment.appointmentServices as any[]).map((svc: any) => (
+                <Descriptions
+                  key={svc.serviceId || svc.id || `${svc.name}-${svc.duration}`}
+                  column={3}
+                  size="small"
+                  style={{ marginBottom: 8 }}
+                >
+                  <Descriptions.Item label="服务">
+                    {svc.name || svc.serviceName || svc.serviceId}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="时长">
+                    {svc.duration || svc.totalDuration || '-'} 分钟
+                  </Descriptions.Item>
+                  <Descriptions.Item label="价格">
+                    {svc.price
+                      ? `$${(svc.price.amount / 100).toFixed(2)}`
+                      : '-'}
+                  </Descriptions.Item>
+                </Descriptions>
+              ))}
+            </>
+          )}
 
         {appointment.clientMessage && (
           <>
@@ -272,7 +305,11 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
         <Divider>备注</Divider>
         {showNoteEdit ? (
           <Space direction="vertical" style={{ width: '100%' }}>
-            <Input.TextArea rows={2} value={editNote} onChange={(e) => setEditNote(e.target.value)} />
+            <Input.TextArea
+              rows={2}
+              value={editNote}
+              onChange={(e) => setEditNote(e.target.value)}
+            />
             <Space>
               <Button type="primary" onClick={handleSaveNote} loading={loading}>
                 保存备注
@@ -299,7 +336,11 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
         <Divider>标签</Divider>
         <Space wrap style={{ marginBottom: 8 }}>
           {((appointment as any).tags || []).map((tag: any) => (
-            <Tag key={tag.id || tag} closable onClose={() => handleRemoveTag(tag.id || tag)}>
+            <Tag
+              key={tag.id || tag}
+              closable
+              onClose={() => handleRemoveTag(tag.id || tag)}
+            >
               {tag.name || tag.id || tag}
             </Tag>
           ))}
@@ -311,7 +352,11 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
             onChange={(e) => setTagInput(e.target.value)}
             style={{ width: 200 }}
           />
-          <Button icon={<PlusOutlined />} onClick={handleAddTag} loading={loading}>
+          <Button
+            icon={<PlusOutlined />}
+            onClick={handleAddTag}
+            loading={loading}
+          >
             添加
           </Button>
         </Space.Compact>
@@ -339,7 +384,11 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
             </Button>
           )}
           {appointment.cancelled && (
-            <Button icon={<UndoOutlined />} onClick={handleRestore} loading={loading}>
+            <Button
+              icon={<UndoOutlined />}
+              onClick={handleRestore}
+              loading={loading}
+            >
               恢复预约
             </Button>
           )}
@@ -351,7 +400,11 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
               改期
             </Button>
           )}
-          <Button icon={<RocketOutlined />} onClick={handleCreateBooking} loading={loading}>
+          <Button
+            icon={<RocketOutlined />}
+            onClick={handleCreateBooking}
+            loading={loading}
+          >
             创建 Booking
           </Button>
           <Popconfirm title="确认删除此预约？" onConfirm={handleDelete}>
@@ -372,7 +425,8 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
 
         <Divider style={{ marginBottom: 8 }} />
         <Text type="secondary" style={{ fontSize: 12 }}>
-          ID: {appointment.id} | 创建于: {dayjs(appointment.createdAt).format('YYYY-MM-DD HH:mm')}
+          ID: {appointment.id} | 创建于:{' '}
+          {dayjs(appointment.createdAt).format('YYYY-MM-DD HH:mm')}
         </Text>
       </Drawer>
 
