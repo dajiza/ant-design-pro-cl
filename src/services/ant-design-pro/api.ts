@@ -175,6 +175,10 @@ export async function getStaff(
   params: {
     page?: number;
     limit?: number;
+    active?: boolean;
+    name?: string;
+    email?: string;
+    locationId?: string;
   },
   options?: { [key: string]: any },
 ) {
@@ -190,6 +194,53 @@ export async function getStaff(
 /** 获取单个员工 GET /api/v1/staff/:id */
 export async function getStaffMember(id: string, options?: { [key: string]: any }) {
   return request<API.StaffItem>(`/api/v1/staff/${id}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 创建员工 POST /api/v1/staff */
+export async function createStaff(data: API.CreateStaffParams, options?: { [key: string]: any }) {
+  return request<API.StaffItem>('/api/v1/staff', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 更新员工 PATCH /api/v1/staff/:id */
+export async function updateStaff(id: string, data: API.UpdateStaffParams, options?: { [key: string]: any }) {
+  return request<API.StaffItem>(`/api/v1/staff/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 分配/取消门店 PATCH /api/v1/staff/:id/location */
+export async function updateStaffLocation(id: string, data: API.UpdateStaffLocationParams, options?: { [key: string]: any }) {
+  return request<{ staffId: string; locationId: string; active: boolean }>(`/api/v1/staff/${id}/location`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 获取员工角色列表 GET /api/staff-roles */
+export async function getStaffRoles(params?: { page?: number; limit?: number }, options?: { [key: string]: any }) {
+  return request<API.StaffRoleList>('/api/staff-roles', {
+    method: 'GET',
+    params: { ...params },
+    ...(options || {}),
+  });
+}
+
+/** 获取员工角色详情 GET /api/staff-roles/:id */
+export async function getStaffRole(id: string, options?: { [key: string]: any }) {
+  return request<API.StaffRoleItem>(`/api/staff-roles/${id}`, {
     method: 'GET',
     ...(options || {}),
   });

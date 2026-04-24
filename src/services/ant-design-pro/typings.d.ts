@@ -201,6 +201,44 @@ declare namespace API {
     total: number;
   };
 
+  type CreateStaffParams = {
+    firstName: string;
+    roleId: string;
+    lastName?: string;
+    nickname?: string;
+    email?: string;
+    mobilePhone?: string;
+    bio?: string;
+    externalNickname?: string;
+  };
+
+  type UpdateStaffParams = {
+    firstName?: string;
+    lastName?: string;
+    nickname?: string;
+    email?: string;
+    mobilePhone?: string;
+    bio?: string;
+    externalNickname?: string;
+    roleId?: string;
+    enabledForFutureLocations?: boolean;
+  };
+
+  type UpdateStaffLocationParams = {
+    locationId: string;
+    active: boolean;
+  };
+
+  type StaffRoleItem = {
+    id: string;
+    name: string;
+  };
+
+  type StaffRoleList = {
+    data: StaffRoleItem[];
+    total: number;
+  };
+
   type AppointmentItem = {
     id: string;
     startAt: string;

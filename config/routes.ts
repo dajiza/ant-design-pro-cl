@@ -132,6 +132,12 @@ export default [
     ],
   },
   {
+    path: '/staff',
+    name: 'staff',
+    icon: 'team',
+    component: './staff',
+  },
+  {
     path: '/kanban',
     name: 'kanban',
     icon: 'appstore',
