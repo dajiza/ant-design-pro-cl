@@ -1,5 +1,5 @@
+import { Form, Input, Modal, Select, Switch } from 'antd';
 import React from 'react';
-import { Modal, Form, Select, Input, Switch } from 'antd';
 
 const cancellationReasons = [
   { value: 'CLIENT_CANCEL', label: '客户取消' },
@@ -15,11 +15,20 @@ const cancellationReasons = [
 interface CancelModalProps {
   open: boolean;
   onCancel: () => void;
-  onOk: (values: { reason: string; notes?: string; notifyClient: boolean }) => void;
+  onOk: (values: {
+    reason: string;
+    notes?: string;
+    notifyClient: boolean;
+  }) => void;
   loading?: boolean;
 }
 
-const CancelModal: React.FC<CancelModalProps> = ({ open, onCancel, onOk, loading }) => {
+const CancelModal: React.FC<CancelModalProps> = ({
+  open,
+  onCancel,
+  onOk,
+  loading,
+}) => {
   const [form] = Form.useForm();
 
   return (

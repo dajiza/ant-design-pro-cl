@@ -1,7 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Modal, Select, Spin, message } from 'antd';
+import { Modal, message, Select, Spin } from 'antd';
 import dayjs from 'dayjs';
-import { getRescheduleAvailableDates, getRescheduleAvailableTimes } from '@/services/ant-design-pro/api';
+import React, { useEffect, useState } from 'react';
+import {
+  getRescheduleAvailableDates,
+  getRescheduleAvailableTimes,
+} from '@/services/ant-design-pro/api';
 
 interface RescheduleModalProps {
   open: boolean;
@@ -61,7 +64,10 @@ const RescheduleModal: React.FC<RescheduleModalProps> = ({
       const time = dayjs(slot.startAt).format('HH:mm');
       if (!seen.has(time)) {
         seen.add(time);
-        timeOptions.push({ value: slot.startAt, label: `${time} - ${staff.staffName}` });
+        timeOptions.push({
+          value: slot.startAt,
+          label: `${time} - ${staff.staffName}`,
+        });
       }
     });
   });
