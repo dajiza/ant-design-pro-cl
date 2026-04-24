@@ -1,210 +1,146 @@
 import { PlusOutlined } from '@ant-design/icons';
-import type { ActionType, ProColumns } from '@ant-design/pro-components';
-import { PageContainer, ProTable } from '@ant-design/pro-components';
-import { history, useIntl } from '@umijs/max';
-import { Badge, Button, Tag, Tooltip } from 'antd';
-import { createStyles } from 'antd-style';
+import type { ProColumns } from '@ant-design/pro-components';
+import { PageContainer } from '@ant-design/pro-components';
+import ProTable from '@ant-design/pro-table';
+import { history } from '@umijs/max';
+import { Button, message } from 'antd';
 import React, { useRef } from 'react';
 import { getAppointments } from '@/services/ant-design-pro/api';
+import AppointmentDrawer from './components/AppointmentDrawer';
+import AppointmentStateBadge from './components/AppointmentStateBadge';
 
-const useStyles = createStyles(() => {
-  return {
-    newWrap: {
-      display: 'flex',
-      justifyContent: 'flex-end',
-    },
-  };
-});
 const AppointmentList: React.FC = () => {
-  const actionRef = useRef<ActionType | null>(null);
-  const intl = useIntl();
+  const actionRef = useRef<any>();
+  const [selectedAppointment, setSelectedAppointment] =
+    React.useState<API.AppointmentItem | null>(null);
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+
+  const getClientName = (record: API.AppointmentItem) => {
+    return (
+      record.client?.name ||
+      `${(record.client as any)?.firstName || ''} ${(record.client as any)?.lastName || ''}`.trim() ||
+      '-'
+    );
+  };
+
+  const getStaffNames = (record: API.AppointmentItem) => {
+    const services = (record.appointmentServices as any[]) || [];
+    return (
+      services.map((s: any) => s.staffName || s.staffId || '-').join(', ') ||
+      '-'
+    );
+  };
+
+  const getServiceNames = (record: API.AppointmentItem) => {
+    const services = (record.appointmentServices as any[]) || [];
+    return (
+      services.map((s: any) => s.name || s.serviceName || '-').join(', ') || '-'
+    );
+  };
 
   const columns: ProColumns<API.AppointmentItem>[] = [
     {
-      title: intl.formatMessage({
-        id: 'pages.appointment.id',
-        defaultMessage: 'ID',
-      }),
-      dataIndex: 'id',
-      width: 100,
-      hideInSearch: true,
-      render: (_, record) => (
-        <Tooltip title={record.id}>
-          <a>{record.id.substring(0, 8)}...</a>
-        </Tooltip>
-      ),
-    },
-    {
-      title: intl.formatMessage({
-        id: 'pages.appointment.startAt',
-        defaultMessage: 'Start Time',
-      }),
+      title: '开始时间',
       dataIndex: 'startAt',
       valueType: 'dateTime',
       sorter: true,
-      hideInSearch: true,
+      hideInSearch: false,
+      width: 180,
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.appointment.duration',
-        defaultMessage: 'Duration',
-      }),
+      title: '状态',
+      dataIndex: 'state',
+      hideInSearch: false,
+      valueEnum: {
+        BOOKED: { text: '已预约', status: 'Processing' },
+        CONFIRMED: { text: '已确认', status: 'Success' },
+        ARRIVED: { text: '已到达', status: 'Warning' },
+        ACTIVE: { text: '进行中', status: 'Processing' },
+        FINAL: { text: '已完成', status: 'Default' },
+        CANCELLED: { text: '已取消', status: 'Error' },
+      },
+      width: 100,
+      render: (_, record) => (
+        <AppointmentStateBadge
+          state={record.state}
+          cancelled={record.cancelled}
+        />
+      ),
+    },
+    {
+      title: '客户',
+      hideInSearch: true,
+      render: (_, record) => getClientName(record),
+      width: 120,
+    },
+    {
+      title: '员工',
+      hideInSearch: true,
+      render: (_, record) => getStaffNames(record),
+      width: 120,
+    },
+    {
+      title: '服务',
+      hideInSearch: true,
+      render: (_, record) => getServiceNames(record),
+      width: 150,
+      ellipsis: true,
+    },
+    {
+      title: '门店',
+      hideInSearch: true,
+      render: (_, record) =>
+        (record.location as any)?.name || record.locationId || '-',
+      width: 120,
+    },
+    {
+      title: '时长',
       dataIndex: 'duration',
       hideInSearch: true,
       render: (_, record) =>
         record.duration ? `${Math.round(record.duration / 60)} min` : '-',
+      width: 80,
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.appointment.state',
-        defaultMessage: 'State',
-      }),
-      dataIndex: 'state',
-      hideInSearch: true,
-      render: (_, record) => {
-        const stateColors: Record<string, string> = {
-          confirmed: 'green',
-          pending: 'orange',
-          cancelled: 'red',
-          completed: 'blue',
-          no_show: 'default',
-        };
-        return (
-          <Tag color={stateColors[record.state || ''] || 'default'}>
-            {record.state || 'Unknown'}
-          </Tag>
-        );
-      },
-      valueEnum: {
-        confirmed: { text: 'Confirmed', status: 'Success' },
-        pending: { text: 'Pending', status: 'Warning' },
-        cancelled: { text: 'Cancelled', status: 'Error' },
-        completed: { text: 'Completed', status: 'Processing' },
-        no_show: { text: 'No Show', status: 'Default' },
-      },
-    },
-    {
-      title: intl.formatMessage({
-        id: 'pages.appointment.cancelled',
-        defaultMessage: 'Cancelled',
-      }),
+      title: '已取消',
       dataIndex: 'cancelled',
-      hideInSearch: true,
-      render: (_, record) => (
-        <Badge
-          status={record.cancelled ? 'error' : 'success'}
-          text={record.cancelled ? 'Yes' : 'No'}
-        />
-      ),
+      hideInSearch: false,
       valueEnum: {
-        true: { text: 'Yes', status: 'Error' },
-        false: { text: 'No', status: 'Success' },
+        true: { text: '是', status: 'Error' },
+        false: { text: '否', status: 'Success' },
       },
-    },
-    {
-      title: intl.formatMessage({
-        id: 'pages.appointment.client',
-        defaultMessage: 'Client',
-      }),
-      dataIndex: 'clientId',
-      render: (_, record) => {
-        const clientName =
-          record.client?.name ||
-          [record.client?.firstName, record.client?.lastName]
-            .filter(Boolean)
-            .join(' ') ||
-          '-';
-        return <a>{clientName}</a>;
-      },
-    },
-    {
-      title: intl.formatMessage({
-        id: 'pages.appointment.staff',
-        defaultMessage: 'Staff',
-      }),
-      dataIndex: 'staffId',
-      render: (_, record) => {
-        const staffName =
-          record.staff?.name ||
-          [record.staff?.firstName, record.staff?.lastName]
-            .filter(Boolean)
-            .join(' ') ||
-          '-';
-        return <a>{staffName}</a>;
-      },
-    },
-    {
-      title: intl.formatMessage({
-        id: 'pages.appointment.location',
-        defaultMessage: 'Location',
-      }),
-      dataIndex: 'locationId',
-      hideInSearch: true,
-      render: (_, record) => record.location?.name || '-',
-    },
-    {
-      title: intl.formatMessage({
-        id: 'pages.appointment.services',
-        defaultMessage: 'Services',
-      }),
-      dataIndex: 'appointmentServices',
-      hideInSearch: true,
-      render: (_, record) =>
-        record.appointmentServices?.length ? (
-          <Tag color="blue">{record.appointmentServices.length} service(s)</Tag>
-        ) : (
-          '-'
-        ),
-    },
-    {
-      title: intl.formatMessage({
-        id: 'pages.appointment.notes',
-        defaultMessage: 'Notes',
-      }),
-      dataIndex: 'notes',
-      hideInSearch: true,
-      ellipsis: true,
-      width: 150,
-    },
-    {
-      title: intl.formatMessage({
-        id: 'pages.appointment.createdAt',
-        defaultMessage: 'Created At',
-      }),
-      dataIndex: 'createdAt',
-      valueType: 'dateTime',
-      sorter: true,
-      hideInSearch: true,
+      width: 80,
     },
   ];
 
-  const { styles } = useStyles();
-
   return (
     <PageContainer>
-      <div className={styles.newWrap}>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => history.push('/appointments/new')}
-        >
-          New Appointment
-        </Button>
-      </div>
       <ProTable<API.AppointmentItem, API.PageParams>
-        headerTitle={intl.formatMessage({
-          id: 'pages.appointment.title',
-          defaultMessage: 'Appointment List',
-        })}
-        actionRef={actionRef}
+        headerTitle="预约列表"
         rowKey="id"
-        search={{
-          labelWidth: 120,
-        }}
+        actionRef={actionRef}
+        toolBarRender={() => [
+          <Button
+            key="new"
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => history.push('/appointments/new')}
+          >
+            新建预约
+          </Button>,
+        ]}
         request={async (params) => {
           const response = await getAppointments({
             page: params.current,
             limit: params.pageSize,
+            state: params.state,
+            startDate: params.startAt ? String(params.startAt) : undefined,
+            cancelled:
+              params.cancelled === 'true'
+                ? true
+                : params.cancelled === 'false'
+                  ? false
+                  : undefined,
           });
           return {
             data: response.data,
@@ -213,10 +149,22 @@ const AppointmentList: React.FC = () => {
           };
         }}
         columns={columns}
-        pagination={{
-          defaultPageSize: 10,
-          showSizeChanger: true,
-        }}
+        pagination={{ defaultPageSize: 10, showSizeChanger: true }}
+        onRow={(record) => ({
+          onClick: () => {
+            setSelectedAppointment(record);
+            setDrawerOpen(true);
+          },
+          style: { cursor: 'pointer' },
+        })}
+        search={{ labelWidth: 'auto' }}
+      />
+
+      <AppointmentDrawer
+        open={drawerOpen}
+        appointment={selectedAppointment}
+        onClose={() => setDrawerOpen(false)}
+        onRefresh={() => actionRef.current?.reload()}
       />
     </PageContainer>
   );
