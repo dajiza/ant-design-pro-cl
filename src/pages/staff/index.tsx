@@ -1,140 +1,234 @@
-import type { ActionType, ProColumns } from '@ant-design/pro-components';
+import { PlusOutlined, UserOutlined } from '@ant-design/icons';
+import type { ProColumns } from '@ant-design/pro-components';
 import { PageContainer, ProTable } from '@ant-design/pro-components';
-import { useIntl } from '@umijs/max';
-import { Avatar, Badge, Tag } from 'antd';
-import React, { useRef } from 'react';
-import { getStaff } from '@/services/ant-design-pro/api';
+import { Avatar, Button, message, Tabs, Tag } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  createStaff,
+  getLocations,
+  getStaff,
+  getStaffRoles,
+} from '@/services/ant-design-pro/api';
+import StaffDrawer from './components/StaffDrawer';
+import StaffFormModal from './components/StaffFormModal';
 
-const StaffList: React.FC = () => {
-  const actionRef = useRef<ActionType | null>(null);
-  const intl = useIntl();
+const StaffPage: React.FC = () => {
+  const actionRef = useRef<any>(null);
+  const roleActionRef = useRef<any>(null);
 
-  const columns: ProColumns<API.StaffItem>[] = [
+  const [selectedStaff, setSelectedStaff] = useState<API.StaffItem | null>(
+    null,
+  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const [roles, setRoles] = useState<API.StaffRoleItem[]>([]);
+  const [locations, setLocations] = useState<API.LocationItem[]>([]);
+
+  useEffect(() => {
+    getStaffRoles({ limit: 100 })
+      .then((r) => setRoles(r.data || []))
+      .catch(() => {});
+    getLocations({ limit: 100 })
+      .then((r) => setLocations(r.data || []))
+      .catch(() => {});
+  }, []);
+
+  const handleCreate = async (values: any) => {
+    setLoading(true);
+    try {
+      await createStaff(values);
+      message.success('员工创建成功');
+      setCreateModalOpen(false);
+      actionRef.current?.reload();
+    } catch (error: any) {
+      message.error(`创建失败: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const staffColumns: ProColumns<API.StaffItem>[] = [
     {
-      title: intl.formatMessage({
-        id: 'pages.staff.avatar',
-        defaultMessage: 'Avatar',
-      }),
+      title: '头像',
       dataIndex: 'avatar',
-      hideInSearch: true,
+      search: false,
       width: 60,
       render: (_, record) => (
-        <Avatar src={record.avatar} size={40}>
-          {record.name?.charAt(0)?.toUpperCase()}
+        <Avatar size="small" src={record.avatar} icon={<UserOutlined />}>
+          {(record.firstName?.[0] || '?').toUpperCase()}
         </Avatar>
       ),
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.staff.name',
-        defaultMessage: 'Name',
-      }),
+      title: '姓名',
       dataIndex: 'name',
-      render: (_, record) => {
-        const fullName =
-          [record.firstName, record.lastName].filter(Boolean).join(' ') ||
-          record.name ||
-          '-';
-        return <a>{fullName}</a>;
-      },
+      render: (_, record) => record.displayName || record.name || '-',
+      width: 120,
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.staff.email',
-        defaultMessage: 'Email',
-      }),
+      title: '邮箱',
       dataIndex: 'email',
-      copyable: true,
+      search: false,
+      width: 180,
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.staff.mobilePhone',
-        defaultMessage: 'Phone',
-      }),
+      title: '手机',
       dataIndex: 'mobilePhone',
+      search: false,
+      width: 130,
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.staff.role',
-        defaultMessage: 'Role',
-      }),
-      dataIndex: 'role',
-      render: (_, record) =>
-        record.role?.name ? <Tag color="blue">{record.role.name}</Tag> : '-',
+      title: '角色',
+      dataIndex: ['role', 'name'],
+      search: false,
+      width: 100,
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.staff.active',
-        defaultMessage: 'Status',
-      }),
+      title: '门店',
+      search: false,
+      render: (_, record) => {
+        const locs = (record.locations as any[]) || [];
+        return locs.length > 0
+          ? locs.map((l: any) => l.name || l.id).join(', ')
+          : '-';
+      },
+      width: 150,
+      ellipsis: true,
+    },
+    {
+      title: '状态',
       dataIndex: 'active',
+      valueEnum: {
+        true: { text: '活跃', status: 'Success' },
+        false: { text: '未激活', status: 'Default' },
+      },
+      width: 80,
       render: (_, record) => (
-        <Badge
-          status={record.active ? 'success' : 'default'}
-          text={record.active ? 'Active' : 'Inactive'}
-        />
+        <Tag color={record.active ? 'green' : 'default'}>
+          {record.active ? '活跃' : '未激活'}
+        </Tag>
       ),
-      valueEnum: {
-        true: { text: 'Active', status: 'Success' },
-        false: { text: 'Inactive', status: 'Default' },
-      },
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.staff.suspended',
-        defaultMessage: 'Suspended',
-      }),
+      title: '停用',
       dataIndex: 'suspended',
-      render: (_, record) =>
-        record.suspended ? <Tag color="red">Suspended</Tag> : <Tag>Normal</Tag>,
-      valueEnum: {
-        true: { text: 'Suspended', status: 'Error' },
-        false: { text: 'Normal', status: 'Success' },
-      },
+      search: false,
+      width: 80,
+      render: (_, record) => (
+        <Tag color={record.suspended ? 'red' : 'green'}>
+          {record.suspended ? '已停用' : '正常'}
+        </Tag>
+      ),
     },
-    {
-      title: intl.formatMessage({
-        id: 'pages.staff.createdAt',
-        defaultMessage: 'Created At',
-      }),
-      dataIndex: 'createdAt',
-      valueType: 'dateTime',
-      sorter: true,
-      hideInSearch: true,
-    },
+  ];
+
+  const roleColumns: ProColumns<any>[] = [
+    { title: 'ID', dataIndex: 'id', width: 350 },
+    { title: '名称', dataIndex: 'name', width: 200 },
   ];
 
   return (
     <PageContainer>
-      <ProTable<API.StaffItem, API.PageParams>
-        headerTitle={intl.formatMessage({
-          id: 'pages.staff.title',
-          defaultMessage: 'Staff List',
-        })}
-        actionRef={actionRef}
-        rowKey="id"
-        search={{
-          labelWidth: 120,
-        }}
-        request={async (params) => {
-          const response = await getStaff({
-            page: params.current,
-            limit: params.pageSize,
-          });
-          return {
-            data: response.data,
-            total: response.total,
-            success: true,
-          };
-        }}
-        columns={columns}
-        pagination={{
-          defaultPageSize: 10,
-          showSizeChanger: true,
-        }}
+      <Tabs
+        items={[
+          {
+            key: 'staff',
+            label: '员工',
+            children: (
+              <ProTable<API.StaffItem>
+                headerTitle="员工列表"
+                rowKey="id"
+                actionRef={actionRef}
+                toolBarRender={() => [
+                  <Button
+                    key="new"
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => setCreateModalOpen(true)}
+                  >
+                    新建员工
+                  </Button>,
+                ]}
+                request={async (params) => {
+                  const response = await getStaff({
+                    page: params.current,
+                    limit: params.pageSize,
+                    active:
+                      params.active === 'true'
+                        ? true
+                        : params.active === 'false'
+                          ? false
+                          : undefined,
+                    name: params.name || undefined,
+                    email: params.email || undefined,
+                  });
+                  return {
+                    data: response.data,
+                    total: response.total,
+                    success: true,
+                  };
+                }}
+                columns={staffColumns}
+                pagination={{ defaultPageSize: 10, showSizeChanger: true }}
+                onRow={(record) => ({
+                  onClick: () => {
+                    setSelectedStaff(record);
+                    setDrawerOpen(true);
+                  },
+                  style: { cursor: 'pointer' },
+                })}
+                search={{ labelWidth: 'auto' }}
+              />
+            ),
+          },
+          {
+            key: 'roles',
+            label: '角色',
+            children: (
+              <ProTable
+                headerTitle="角色列表"
+                rowKey="id"
+                actionRef={roleActionRef}
+                request={async (params) => {
+                  const response = await getStaffRoles({
+                    page: params.current,
+                    limit: params.pageSize,
+                  });
+                  return {
+                    data: response.data,
+                    total: response.total,
+                    success: true,
+                  };
+                }}
+                columns={roleColumns}
+                pagination={{ defaultPageSize: 10 }}
+                search={false}
+              />
+            ),
+          },
+        ]}
+      />
+
+      <StaffDrawer
+        open={drawerOpen}
+        staff={selectedStaff}
+        roles={roles}
+        locations={locations}
+        onClose={() => setDrawerOpen(false)}
+        onRefresh={() => actionRef.current?.reload()}
+      />
+
+      <StaffFormModal
+        open={createModalOpen}
+        roles={roles}
+        onCancel={() => setCreateModalOpen(false)}
+        onOk={handleCreate}
+        loading={loading}
       />
     </PageContainer>
   );
 };
 
-export default StaffList;
+export default StaffPage;
