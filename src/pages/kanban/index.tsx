@@ -48,21 +48,15 @@ function stateToColumnId(state: string): string | null {
 }
 
 /**
- * Strict linear state machine (must match backend):
- * BOOKED → CONFIRMED → ARRIVED → ACTIVE → FINAL (via checkout only)
- * Each state can also transition to CANCELLED (via cancel endpoint only).
+ * Target state for each column when an appointment is dropped on it.
+ * Backend allows free transitions between BOOKED/CONFIRMED/ARRIVED/ACTIVE.
+ * FINAL is set via checkout only, CANCELLED via cancel endpoint only.
  */
-const VALID_NEXT_STATE: Record<string, string | null> = {
-  BOOKED: 'CONFIRMED',
-  CONFIRMED: 'ARRIVED',
-  ARRIVED: 'ACTIVE',
-  ACTIVE: null, // → FINAL via checkout only
-  FINAL: null,
-  CANCELLED: null,
+const COLUMN_TARGET_STATE: Record<string, string | null> = {
+  booked: 'CONFIRMED',
+  arrived: 'ARRIVED',
+  active: 'ACTIVE',
 };
-
-/** Column order index for forward-only check */
-const COLUMN_ORDER = ['booked', 'arrived', 'active', 'completed'];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -224,26 +218,19 @@ const Kanban: React.FC = () => {
         return;
       }
 
-      // Only allow dragging forward (not backward)
-      const sourceIdx = COLUMN_ORDER.indexOf(sourceColId);
-      const destIdx = COLUMN_ORDER.indexOf(destColId);
-      if (destIdx <= sourceIdx) {
-        message.warning('只能向前拖拽预约状态');
-        return;
-      }
+      // Get target state for the destination column
+      const newState = COLUMN_TARGET_STATE[destColId];
+      if (!newState) return;
 
-      // Get the next valid state from the appointment's current state
-      const currentState = apt.state || '';
-      const nextState = VALID_NEXT_STATE[currentState];
-      if (!nextState) {
-        message.warning('该预约状态无法变更');
-        return;
-      }
+      // Already in a state belonging to this column — no change needed
+      const destColumnStates =
+        COLUMN_DEFS.find((c) => c.id === destColId)?.states ?? [];
+      if (destColumnStates.includes(apt.state || '')) return;
 
       // Optimistic update
       const prevState = apt.state;
       setAppointments((prev) =>
-        prev.map((a) => (a.id === apt.id ? { ...a, state: nextState } : a)),
+        prev.map((a) => (a.id === apt.id ? { ...a, state: newState } : a)),
       );
 
       try {
