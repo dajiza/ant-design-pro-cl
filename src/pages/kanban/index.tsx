@@ -47,12 +47,22 @@ function stateToColumnId(state: string): string | null {
   return null;
 }
 
-/** State transitions allowed when dragging between columns */
-const DRAG_TRANSITIONS: Record<string, string> = {
-  booked: 'ARRIVED',
-  arrived: 'ACTIVE',
-  active: 'FINAL',
+/**
+ * Strict linear state machine (must match backend):
+ * BOOKED → CONFIRMED → ARRIVED → ACTIVE → FINAL (via checkout only)
+ * Each state can also transition to CANCELLED (via cancel endpoint only).
+ */
+const VALID_NEXT_STATE: Record<string, string | null> = {
+  BOOKED: 'CONFIRMED',
+  CONFIRMED: 'ARRIVED',
+  ARRIVED: 'ACTIVE',
+  ACTIVE: null, // → FINAL via checkout only
+  FINAL: null,
+  CANCELLED: null,
 };
+
+/** Column order index for forward-only check */
+const COLUMN_ORDER = ['booked', 'arrived', 'active', 'completed'];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -196,26 +206,38 @@ const Kanban: React.FC = () => {
       const apt = appointments.find((a) => a.id === draggableId);
       if (!apt) return;
 
-      const newState = DRAG_TRANSITIONS[destColId];
-      if (!newState) return;
-
-      // Special: dragging to "completed" opens checkout modal
+      // Dragging to "completed" column → open checkout modal
       if (destColId === 'completed') {
         setCheckoutAppointment(apt);
         setCheckoutModalOpen(true);
         return;
       }
 
-      // Optimistic update: move appointment in local state
+      // Only allow dragging forward (not backward)
+      const sourceIdx = COLUMN_ORDER.indexOf(sourceColId);
+      const destIdx = COLUMN_ORDER.indexOf(destColId);
+      if (destIdx <= sourceIdx) {
+        message.warning('只能向前拖拽预约状态');
+        return;
+      }
+
+      // Get the next valid state from the appointment's current state
+      const currentState = apt.state || '';
+      const nextState = VALID_NEXT_STATE[currentState];
+      if (!nextState) {
+        message.warning('该预约状态无法变更');
+        return;
+      }
+
+      // Optimistic update
       const prevState = apt.state;
       setAppointments((prev) =>
-        prev.map((a) => (a.id === apt.id ? { ...a, state: newState } : a)),
+        prev.map((a) => (a.id === apt.id ? { ...a, state: nextState } : a)),
       );
 
       try {
-        await updateAppointmentState(apt.id, newState as API.AppointmentState);
+        await updateAppointmentState(apt.id, nextState as API.AppointmentState);
       } catch {
-        // Revert on failure
         message.error('状态更新失败，已恢复');
         setAppointments((prev) =>
           prev.map((a) => (a.id === apt.id ? { ...a, state: prevState } : a)),
