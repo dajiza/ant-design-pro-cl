@@ -119,13 +119,16 @@ const Kanban: React.FC = () => {
         : locations[0];
       const tz = (loc as any)?.tz || 'UTC';
 
-      const startOfDay = selectedDate
-        .tz(tz)
+      // Interpret the selected calendar date in the location's timezone
+      // (NOT a timezone conversion — we want "May 18" to mean "May 18 at this location")
+      const dateStr = selectedDate.format('YYYY-MM-DD');
+      const startOfDay = dayjs
+        .tz(dateStr, tz)
         .startOf('day')
         .utc()
         .format('YYYY-MM-DDTHH:mm:ss[Z]');
-      const endOfDay = selectedDate
-        .tz(tz)
+      const endOfDay = dayjs
+        .tz(dateStr, tz)
         .endOf('day')
         .utc()
         .format('YYYY-MM-DDTHH:mm:ss[Z]');
