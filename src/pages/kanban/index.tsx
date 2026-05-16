@@ -234,7 +234,7 @@ const Kanban: React.FC = () => {
       );
 
       try {
-        await updateAppointmentState(apt.id, nextState as API.AppointmentState);
+        await updateAppointmentState(apt.id, newState as API.AppointmentState);
       } catch {
         message.error('状态更新失败，已恢复');
         setAppointments((prev) =>
