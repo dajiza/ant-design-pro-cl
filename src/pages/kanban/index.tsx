@@ -113,11 +113,19 @@ const Kanban: React.FC = () => {
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
     try {
+      // Use the location's timezone for date boundaries, not browser timezone
+      const loc = selectedLocationId
+        ? locations.find((l) => l.id === selectedLocationId)
+        : locations[0];
+      const tz = (loc as any)?.tz || 'UTC';
+
       const startOfDay = selectedDate
+        .tz(tz)
         .startOf('day')
         .utc()
         .format('YYYY-MM-DDTHH:mm:ss[Z]');
       const endOfDay = selectedDate
+        .tz(tz)
         .endOf('day')
         .utc()
         .format('YYYY-MM-DDTHH:mm:ss[Z]');
@@ -135,7 +143,7 @@ const Kanban: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, selectedLocationId]);
+  }, [selectedDate, selectedLocationId, locations]);
 
   useEffect(() => {
     fetchAppointments();
