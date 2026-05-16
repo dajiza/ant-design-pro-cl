@@ -28,35 +28,28 @@ interface ColumnDef {
 }
 
 const COLUMN_DEFS: ColumnDef[] = [
+  { id: 'BOOKED', title: 'Unconfirmed', color: '#8c8c8c', states: ['BOOKED'] },
   {
-    id: 'booked',
-    title: '已预约',
+    id: 'CONFIRMED',
+    title: 'Confirmed',
     color: '#1677ff',
-    states: ['BOOKED', 'CONFIRMED'],
+    states: ['CONFIRMED'],
   },
-  { id: 'arrived', title: '已到达', color: '#faad14', states: ['ARRIVED'] },
-  { id: 'active', title: '进行中', color: '#52c41a', states: ['ACTIVE'] },
-  { id: 'completed', title: '已完成', color: '#722ed1', states: ['FINAL'] },
+  { id: 'ARRIVED', title: 'Arrived', color: '#faad14', states: ['ARRIVED'] },
+  { id: 'ACTIVE', title: 'Active', color: '#52c41a', states: ['ACTIVE'] },
+  { id: 'FINAL', title: 'Completed', color: '#722ed1', states: ['FINAL'] },
 ];
 
-/** Map a state string to its column id */
+/** Map a state string to its column id (1:1 mapping now) */
 function stateToColumnId(state: string): string | null {
-  for (const col of COLUMN_DEFS) {
-    if (col.states.includes(state)) return col.id;
-  }
-  return null;
+  return COLUMN_DEFS.find((col) => col.states.includes(state))?.id ?? null;
 }
 
 /**
- * Target state for each column when an appointment is dropped on it.
- * Backend allows free transitions between BOOKED/CONFIRMED/ARRIVED/ACTIVE.
- * FINAL is set via checkout only, CANCELLED via cancel endpoint only.
+ * Column id now equals the AppointmentState directly.
+ * When dropping on a column, target state = column id.
+ * FINAL column triggers checkout modal instead.
  */
-const COLUMN_TARGET_STATE: Record<string, string | null> = {
-  booked: 'CONFIRMED',
-  arrived: 'ARRIVED',
-  active: 'ACTIVE',
-};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -211,21 +204,18 @@ const Kanban: React.FC = () => {
       const apt = appointments.find((a) => a.id === draggableId);
       if (!apt) return;
 
-      // Dragging to "completed" column → open checkout modal
-      if (destColId === 'completed') {
+      // Dragging to "FINAL" column → open checkout modal
+      if (destColId === 'FINAL') {
         setCheckoutAppointment(apt);
         setCheckoutModalOpen(true);
         return;
       }
 
-      // Get target state for the destination column
-      const newState = COLUMN_TARGET_STATE[destColId];
-      if (!newState) return;
+      // Target state = column id (1:1 mapping)
+      const newState = destColId;
 
-      // Already in a state belonging to this column — no change needed
-      const destColumnStates =
-        COLUMN_DEFS.find((c) => c.id === destColId)?.states ?? [];
-      if (destColumnStates.includes(apt.state || '')) return;
+      // Already in this state — no change needed
+      if (apt.state === newState) return;
 
       // Optimistic update
       const prevState = apt.state;
@@ -332,7 +322,7 @@ const Kanban: React.FC = () => {
               <KanbanColumn
                 key={col.id}
                 column={col}
-                isCompletedColumn={col.id === 'completed'}
+                isCompletedColumn={col.id === 'FINAL'}
               />
             ))}
           </div>
