@@ -1,6 +1,7 @@
+import { ReloadOutlined } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
-import { DatePicker, message, Select, Spin } from 'antd';
+import { Button, DatePicker, message, Select, Spin, Tooltip } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
@@ -305,6 +306,13 @@ const Kanban: React.FC = () => {
         <span style={{ color: '#999', fontSize: 13 }}>
           共 {totalCount} 个预约
         </span>
+        <Tooltip title="刷新">
+          <Button
+            type="text"
+            icon={<ReloadOutlined spin={loading} />}
+            onClick={fetchAppointments}
+          />
+        </Tooltip>
       </div>
 
       {/* Board */}
