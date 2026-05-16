@@ -1,287 +1,332 @@
+import { PageContainer } from '@ant-design/pro-components';
+import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
+import { DatePicker, message, Select, Spin } from 'antd';
+import dayjs, { type Dayjs } from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  DragDropContext,
-  Draggable,
-  Droppable,
-  type DropResult,
-} from '@hello-pangea/dnd';
-import { Card, Tag, Typography } from 'antd';
-import { createStyles } from 'antd-style';
-import React, { useState } from 'react';
+  getAppointments,
+  getLocations,
+  updateAppointmentState,
+} from '@/services/ant-design-pro/api';
+import CheckoutModal from './components/CheckoutModal';
+import KanbanColumn, { type KanbanColumnData } from './components/KanbanColumn';
 
-const { Title } = Typography;
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
-interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  priority: 'high' | 'medium' | 'low';
-}
+// ---------------------------------------------------------------------------
+// Column definitions
+// ---------------------------------------------------------------------------
 
-interface Column {
+interface ColumnDef {
   id: string;
   title: string;
   color: string;
-  tasks: Task[];
+  states: string[];
 }
 
-const initialColumns: Column[] = [
+const COLUMN_DEFS: ColumnDef[] = [
   {
-    id: 'todo',
-    title: '待办',
-    color: '#1890ff',
-    tasks: [
-      {
-        id: '1',
-        title: '设计登录页面',
-        description: '完成用户登录界面设计',
-        priority: 'high',
-      },
-      {
-        id: '2',
-        title: '编写API文档',
-        description: '整理后端接口文档',
-        priority: 'medium',
-      },
-    ],
+    id: 'booked',
+    title: '已预约',
+    color: '#1677ff',
+    states: ['BOOKED', 'CONFIRMED'],
   },
-  {
-    id: 'inProgress',
-    title: '进行中',
-    color: '#faad14',
-    tasks: [
-      {
-        id: '3',
-        title: '开发用户模块',
-        description: '实现用户增删改查',
-        priority: 'high',
-      },
-    ],
-  },
-  {
-    id: 'done',
-    title: '已完成',
-    color: '#52c41a',
-    tasks: [
-      {
-        id: '4',
-        title: '项目初始化',
-        description: '搭建基础框架',
-        priority: 'low',
-      },
-    ],
-  },
-  {
-    id: 'archived',
-    title: '已归档',
-    color: '#8c8c8c',
-    tasks: [],
-  },
+  { id: 'arrived', title: '已到达', color: '#faad14', states: ['ARRIVED'] },
+  { id: 'active', title: '进行中', color: '#52c41a', states: ['ACTIVE'] },
+  { id: 'completed', title: '已完成', color: '#722ed1', states: ['FINAL'] },
 ];
 
-const useStyles = createStyles(({ token, css }) => ({
-  container: css`
-    padding: 24px;
-    min-height: calc(100vh - 200px);
-  `,
-  board: css`
-    display: flex;
-    gap: 16px;
-    overflow-x: auto;
-    padding-bottom: 16px;
-  `,
-  column: css`
-    min-width: 300px;
-    max-width: 300px;
-    background: ${token.colorBgContainer};
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    max-height: calc(100vh - 280px);
-  `,
-  columnHeader: css`
-    padding: 16px;
-    border-bottom: 1px solid ${token.colorBorderSecondary};
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  `,
-  columnTitle: css`
-    margin: 0 !important;
-    font-size: 16px !important;
-  `,
-  taskCount: css`
-    background: ${token.colorBgTextHover};
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 12px;
-    color: ${token.colorTextSecondary};
-  `,
-  taskList: css`
-    padding: 12px;
-    flex: 1;
-    overflow-y: auto;
-    min-height: 100px;
-  `,
-  taskCard: css`
-    margin-bottom: 12px;
-    cursor: grab;
-    border-radius: 6px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+/** Map a state string to its column id */
+function stateToColumnId(state: string): string | null {
+  for (const col of COLUMN_DEFS) {
+    if (col.states.includes(state)) return col.id;
+  }
+  return null;
+}
 
-    &:last-child {
-      margin-bottom: 0;
-    }
-
-    &:active {
-      cursor: grabbing;
-    }
-  `,
-  taskTitle: css`
-    font-weight: 500;
-    margin-bottom: 8px;
-  `,
-  taskDescription: css`
-    font-size: 12px;
-    color: ${token.colorTextSecondary};
-    margin-bottom: 8px;
-  `,
-  priorityTag: css`
-    font-size: 11px;
-  `,
-  placeholder: css`
-    padding: 16px;
-    text-align: center;
-    color: ${token.colorTextQuaternary};
-    font-size: 14px;
-  `,
-}));
-
-const priorityConfig = {
-  high: { color: 'red', text: '高' },
-  medium: { color: 'orange', text: '中' },
-  low: { color: 'blue', text: '低' },
+/** State transitions allowed when dragging between columns */
+const DRAG_TRANSITIONS: Record<string, string> = {
+  booked: 'ARRIVED',
+  arrived: 'ACTIVE',
+  active: 'FINAL',
 };
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 const Kanban: React.FC = () => {
-  const { styles } = useStyles();
-  const [columns, setColumns] = useState<Column[]>(initialColumns);
+  // ---- filters ----
+  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());
+  const [selectedLocationId, setSelectedLocationId] = useState<
+    string | undefined
+  >(undefined);
+  const [locations, setLocations] = useState<API.LocationItem[]>([]);
 
-  const onDragEnd = (result: DropResult) => {
-    const { source, destination } = result;
+  // ---- data ----
+  const [appointments, setAppointments] = useState<API.AppointmentItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
-    // 拖出看板区域
-    if (!destination) return;
+  // ---- checkout ----
+  const [checkoutAppointment, setCheckoutAppointment] =
+    useState<API.AppointmentItem | null>(null);
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
 
-    // 位置没变
-    if (
-      source.droppableId === destination.droppableId &&
-      source.index === destination.index
-    ) {
-      return;
+  // ---- checkout tracking ----
+  const [checkoutAmounts, setCheckoutAmounts] = useState<
+    Record<string, number | null>
+  >({});
+  const [checkoutPendingSet, setCheckoutPendingSet] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // =========================
+  // Fetch locations (once)
+  // =========================
+  useEffect(() => {
+    getLocations({ limit: 100 })
+      .then((res) => {
+        const list = res?.data ?? [];
+        setLocations(list);
+      })
+      .catch(() => {
+        message.error('获取门店列表失败');
+      });
+  }, []);
+
+  // =========================
+  // Fetch appointments
+  // =========================
+  const fetchAppointments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const startOfDay = selectedDate
+        .startOf('day')
+        .utc()
+        .format('YYYY-MM-DDTHH:mm:ss[Z]');
+      const endOfDay = selectedDate
+        .endOf('day')
+        .utc()
+        .format('YYYY-MM-DDTHH:mm:ss[Z]');
+
+      const res = await getAppointments({
+        startDate: startOfDay,
+        endDate: endOfDay,
+        locationId: selectedLocationId,
+        limit: 500,
+      });
+
+      setAppointments(res?.data ?? []);
+    } catch {
+      message.error('获取预约数据失败');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDate, selectedLocationId]);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
+
+  // =========================
+  // Build columns
+  // =========================
+  const columns: KanbanColumnData[] = useMemo(() => {
+    const grouped: Record<string, API.AppointmentItem[]> = {};
+    for (const col of COLUMN_DEFS) {
+      grouped[col.id] = [];
     }
 
-    const newColumns = [...columns];
-    const sourceColumn = newColumns.find(
-      (col) => col.id === source.droppableId,
-    );
-    const destColumn = newColumns.find(
-      (col) => col.id === destination.droppableId,
-    );
+    for (const apt of appointments) {
+      // Skip cancelled appointments
+      if (apt.cancelled) continue;
+      const colId = stateToColumnId(apt.state || '');
+      if (colId) {
+        grouped[colId].push(apt);
+      }
+    }
 
-    if (!sourceColumn || !destColumn) return;
+    return COLUMN_DEFS.map((def) => ({
+      id: def.id,
+      title: def.title,
+      color: def.color,
+      states: def.states,
+      appointments: grouped[def.id],
+      checkoutAmounts,
+      checkoutPendingSet,
+    }));
+  }, [appointments, checkoutAmounts, checkoutPendingSet]);
 
-    // 从源列移除任务
-    const [movedTask] = sourceColumn.tasks.splice(source.index, 1);
+  // =========================
+  // Total appointment count
+  // =========================
+  const totalCount = useMemo(
+    () => columns.reduce((sum, col) => sum + col.appointments.length, 0),
+    [columns],
+  );
 
-    // 添加到目标列
-    destColumn.tasks.splice(destination.index, 0, movedTask);
+  // =========================
+  // Drag & Drop handler
+  // =========================
+  const onDragEnd = useCallback(
+    async (result: DropResult) => {
+      const { source, destination, draggableId } = result;
 
-    setColumns(newColumns);
-  };
+      // Dropped outside the board
+      if (!destination) return;
 
+      // No position change
+      if (
+        source.droppableId === destination.droppableId &&
+        source.index === destination.index
+      ) {
+        return;
+      }
+
+      const sourceColId = source.droppableId;
+      const destColId = destination.droppableId;
+
+      // No actual column change → reorder within same column (ignore for now)
+      if (sourceColId === destColId) return;
+
+      // Find the appointment
+      const apt = appointments.find((a) => a.id === draggableId);
+      if (!apt) return;
+
+      const newState = DRAG_TRANSITIONS[destColId];
+      if (!newState) return;
+
+      // Special: dragging to "completed" opens checkout modal
+      if (destColId === 'completed') {
+        setCheckoutAppointment(apt);
+        setCheckoutModalOpen(true);
+        return;
+      }
+
+      // Optimistic update: move appointment in local state
+      const prevState = apt.state;
+      setAppointments((prev) =>
+        prev.map((a) => (a.id === apt.id ? { ...a, state: newState } : a)),
+      );
+
+      try {
+        await updateAppointmentState(apt.id, newState as API.AppointmentState);
+      } catch {
+        // Revert on failure
+        message.error('状态更新失败，已恢复');
+        setAppointments((prev) =>
+          prev.map((a) => (a.id === apt.id ? { ...a, state: prevState } : a)),
+        );
+      }
+    },
+    [appointments],
+  );
+
+  // =========================
+  // Checkout handlers
+  // =========================
+  const handleCheckoutSuccess = useCallback((res: API.CheckoutResponse) => {
+    const aptId = res?.appointment?.id;
+    const totalAmount = res?.order?.totalAmount ?? null;
+
+    if (aptId) {
+      // Update local state to FINAL
+      setAppointments((prev) =>
+        prev.map((a) => (a.id === aptId ? { ...a, state: 'FINAL' } : a)),
+      );
+
+      // Record checkout amount
+      if (totalAmount != null) {
+        setCheckoutAmounts((prev) => ({ ...prev, [aptId]: totalAmount }));
+      }
+
+      // Track if payment is still pending (no credit card payment captured)
+      const hasPayment = res?.payment != null;
+      if (!hasPayment) {
+        setCheckoutPendingSet((prev) => new Set(prev).add(aptId));
+      }
+    }
+
+    message.success('结账成功');
+  }, []);
+
+  const handleCheckoutClose = useCallback(() => {
+    setCheckoutModalOpen(false);
+    setCheckoutAppointment(null);
+    // Refresh data to ensure consistency
+    fetchAppointments();
+  }, [fetchAppointments]);
+
+  // =========================
+  // Render
+  // =========================
   return (
-    <div className={styles.container}>
-      <Title level={4} style={{ marginBottom: 24 }}>
-        任务看板
-      </Title>
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className={styles.board}>
-          {columns.map((column) => (
-            <div key={column.id} className={styles.column}>
-              <div className={styles.columnHeader}>
-                <div
-                  style={{
-                    width: 4,
-                    height: 16,
-                    backgroundColor: column.color,
-                    borderRadius: 2,
-                  }}
-                />
-                <Title level={5} className={styles.columnTitle}>
-                  {column.title}
-                </Title>
-                <span className={styles.taskCount}>{column.tasks.length}</span>
-              </div>
-              <Droppable droppableId={column.id}>
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={styles.taskList}
-                    style={{
-                      backgroundColor: snapshot.isDraggingOver
-                        ? 'rgba(0,0,0,0.02)'
-                        : 'transparent',
-                    }}
-                  >
-                    {column.tasks.length === 0 ? (
-                      <div className={styles.placeholder}>拖拽任务到这里</div>
-                    ) : (
-                      column.tasks.map((task, index) => (
-                        <Draggable
-                          key={task.id}
-                          draggableId={task.id}
-                          index={index}
-                        >
-                          {(provided, snapshot) => (
-                            <Card
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className={styles.taskCard}
-                              size="small"
-                              style={{
-                                opacity: snapshot.isDragging ? 0.8 : 1,
-                              }}
-                            >
-                              <div className={styles.taskTitle}>
-                                {task.title}
-                              </div>
-                              {task.description && (
-                                <div className={styles.taskDescription}>
-                                  {task.description}
-                                </div>
-                              )}
-                              <Tag
-                                className={styles.priorityTag}
-                                color={priorityConfig[task.priority].color}
-                              >
-                                {priorityConfig[task.priority].text}
-                              </Tag>
-                            </Card>
-                          )}
-                        </Draggable>
-                      ))
-                    )}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </div>
-          ))}
-        </div>
-      </DragDropContext>
-    </div>
+    <PageContainer>
+      {/* Filters */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          marginBottom: 16,
+        }}
+      >
+        <DatePicker
+          value={selectedDate}
+          onChange={(date) => date && setSelectedDate(date)}
+          allowClear={false}
+        />
+        {locations.length > 1 && (
+          <Select
+            style={{ width: 200 }}
+            placeholder="选择门店"
+            allowClear
+            value={selectedLocationId}
+            onChange={(val) => setSelectedLocationId(val)}
+            options={locations.map((loc) => ({
+              value: loc.id,
+              label: loc.name,
+            }))}
+          />
+        )}
+        <span style={{ color: '#999', fontSize: 13 }}>
+          共 {totalCount} 个预约
+        </span>
+      </div>
+
+      {/* Board */}
+      <Spin spinning={loading}>
+        <DragDropContext onDragEnd={onDragEnd}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 16,
+              overflowX: 'auto',
+              paddingBottom: 16,
+            }}
+          >
+            {columns.map((col) => (
+              <KanbanColumn
+                key={col.id}
+                column={col}
+                isCompletedColumn={col.id === 'completed'}
+              />
+            ))}
+          </div>
+        </DragDropContext>
+      </Spin>
+
+      {/* Checkout Modal */}
+      <CheckoutModal
+        open={checkoutModalOpen}
+        appointment={checkoutAppointment}
+        onClose={handleCheckoutClose}
+        onSuccess={handleCheckoutSuccess}
+      />
+    </PageContainer>
   );
 };
 

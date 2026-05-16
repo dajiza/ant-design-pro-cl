@@ -108,6 +108,9 @@ export async function getClients(
   params: {
     page?: number;
     limit?: number;
+    active?: boolean;
+    name?: string;
+    email?: string;
   },
   options?: { [key: string]: any },
 ) {
@@ -124,6 +127,44 @@ export async function getClients(
 export async function getClient(id: string, options?: { [key: string]: any }) {
   return request<API.ClientItem>(`/api/v1/clients/${id}`, {
     method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 创建客户 POST /api/v1/clients */
+export async function createClient(data: API.CreateClientParams, options?: { [key: string]: any }) {
+  return request<API.ClientItem>('/api/v1/clients', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 更新客户 PATCH /api/v1/clients/:id */
+export async function updateClient(id: string, data: API.UpdateClientParams, options?: { [key: string]: any }) {
+  return request<API.ClientItem>(`/api/v1/clients/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 创建客户备注 POST /api/v1/clients/:id/notes */
+export async function createClientNote(id: string, data: { text: string }, options?: { [key: string]: any }) {
+  return request<API.ClientItem>(`/api/v1/clients/${id}/notes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 删除客户备注 DELETE /api/v1/clients/:id/notes/:noteId */
+export async function deleteClientNote(id: string, noteId: string, options?: { [key: string]: any }) {
+  return request(`/api/v1/clients/${id}/notes/${noteId}`, {
+    method: 'DELETE',
     ...(options || {}),
   });
 }
@@ -152,7 +193,7 @@ export async function getServiceCategories(
   },
   options?: { [key: string]: any },
 ) {
-  return request<API.ServiceCategoryList>('/api/service-categories', {
+  return request<API.ServiceCategoryList>('/api/v1/service-categories', {
     method: 'GET',
     params: {
       page: params?.page || 1,
@@ -231,7 +272,7 @@ export async function updateStaffLocation(id: string, data: API.UpdateStaffLocat
 
 /** 获取员工角色列表 GET /api/staff-roles */
 export async function getStaffRoles(params?: { page?: number; limit?: number }, options?: { [key: string]: any }) {
-  return request<API.StaffRoleList>('/api/staff-roles', {
+  return request<API.StaffRoleList>('/api/v1/staff-roles', {
     method: 'GET',
     params: { ...params },
     ...(options || {}),
@@ -252,6 +293,8 @@ export async function getAppointments(
     page?: number;
     limit?: number;
     staffId?: string;
+    employeeId?: string;
+    locationId?: string;
     roomId?: string;
     equipmentId?: string;
     startDate?: string;
@@ -327,6 +370,7 @@ export async function createAppointment(
     id?: string;
     clientId: string;
     staffId: string;
+    employeeId?: string | null;
     startAt: string;
     cancelled: boolean;
     duration?: number;
@@ -355,6 +399,7 @@ export async function updateAppointment(
     startAt?: string;
     endAt?: string;
     staffId?: string;
+    employeeId?: string | null;
     roomId?: string | null;
     equipmentId?: string | null;
     notes?: string;
@@ -537,7 +582,7 @@ export async function getLocations(
   },
   options?: { [key: string]: any },
 ) {
-  return request<API.LocationList>('/api/locations', {
+  return request<API.LocationList>('/api/v1/locations', {
     method: 'GET',
     params: {
       page: params?.page || 1,
@@ -559,13 +604,19 @@ export async function getLocation(id: string, options?: { [key: string]: any }) 
 
 /** 创建预约会话 POST /api/v1/booking */
 export async function bookingCreate(
-  locationId: string,
+  data: {
+    locationId: string;
+    clientId?: string;
+    services?: { serviceId: string; staffId?: string; employeeId?: string; startTimeOffset?: number }[];
+    notes?: string;
+    clientMessage?: string;
+  },
   options?: { [key: string]: any },
 ) {
   return request<API.BookingSessionItem>('/api/v1/booking', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    data: { locationId },
+    data,
     ...(options || {}),
   });
 }
@@ -581,67 +632,19 @@ export async function bookingGetSession(
   });
 }
 
-/** 添加服务到会话 POST /api/v1/booking/:id/services */
-export async function bookingAddService(
+/** 更新预约会话 PATCH /api/v1/booking/:id */
+export async function bookingUpdateSession(
   sessionId: string,
-  data: { serviceId: string; staffId?: string; startTimeOffset?: number },
+  data: {
+    clientId?: string;
+    services?: { serviceId: string; staffId?: string; employeeId?: string; startTimeOffset?: number }[];
+    startAt?: string;
+    notes?: string;
+    clientMessage?: string;
+  },
   options?: { [key: string]: any },
 ) {
-  return request<API.BookingSessionItem>(`/api/v1/booking/${sessionId}/services`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    data,
-    ...(options || {}),
-  });
-}
-
-/** 移除服务 DELETE /api/v1/booking/:id/services/:index */
-export async function bookingRemoveService(
-  sessionId: string,
-  index: number,
-  options?: { [key: string]: any },
-) {
-  return request<API.BookingSessionItem>(`/api/v1/booking/${sessionId}/services/${index}`, {
-    method: 'DELETE',
-    ...(options || {}),
-  });
-}
-
-/** 设置客户 PATCH /api/v1/booking/:id/client */
-export async function bookingSetClient(
-  sessionId: string,
-  clientId: string,
-  options?: { [key: string]: any },
-) {
-  return request<API.BookingSessionItem>(`/api/v1/booking/${sessionId}/client`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    data: { clientId },
-    ...(options || {}),
-  });
-}
-
-/** 设置开始时间 PATCH /api/v1/booking/:id/time */
-export async function bookingSetTime(
-  sessionId: string,
-  startAt: string,
-  options?: { [key: string]: any },
-) {
-  return request<API.BookingSessionItem>(`/api/v1/booking/${sessionId}/time`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    data: { startAt },
-    ...(options || {}),
-  });
-}
-
-/** 设置员工 PATCH /api/v1/booking/:id/staff */
-export async function bookingSetStaff(
-  sessionId: string,
-  data: { serviceIndex: number; staffId: string },
-  options?: { [key: string]: any },
-) {
-  return request<API.BookingSessionItem>(`/api/v1/booking/${sessionId}/staff`, {
+  return request<API.BookingSessionItem>(`/api/v1/booking/${sessionId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     data,
@@ -679,6 +682,7 @@ export async function getAvailableDates(
     locationId: string;
     serviceId: string;
     staffId?: string;
+    employeeId?: string;
     searchRangeLower?: string;
     searchRangeUpper?: string;
   },
@@ -698,6 +702,7 @@ export async function getAvailableTimes(
     serviceId: string;
     date: string;
     staffId?: string;
+    employeeId?: string;
   },
   options?: { [key: string]: any },
 ) {
@@ -715,6 +720,7 @@ export async function getAvailableStaff(
     serviceId: string;
     startAt: string;
     durationMinutes?: number;
+    employeeId?: string;
   },
   options?: { [key: string]: any },
 ) {
@@ -755,7 +761,7 @@ export async function restoreAppointment(
 /** 改期预约 POST /api/v1/appointments/:id/reschedule */
 export async function rescheduleAppointment(
   id: string,
-  data: { startAt: string; staffId?: string },
+  data: { startAt: string; staffId?: string; employeeId?: string },
   options?: { [key: string]: any },
 ) {
   return request<API.AppointmentItem>(`/api/v1/appointments/${id}/reschedule`, {
@@ -843,6 +849,287 @@ export async function updateAppointmentState(
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     data: { state },
+    ...(options || {}),
+  });
+}
+
+/** 结账 POST /api/v1/appointments/:id/checkout */
+export async function checkoutAppointment(
+  id: string,
+  data: API.CheckoutRequest,
+  options?: { [key: string]: any },
+) {
+  return request<API.CheckoutResponse>(
+    `/api/v1/appointments/${id}/checkout`,
+    {
+      method: 'POST',
+      data,
+      ...(options || {}),
+    },
+  );
+}
+
+// ===== Location API =====
+
+/** 编辑门店信息 PATCH /api/v1/locations/:id */
+export async function updateLocation(id: string, data: API.UpdateLocationParams, options?: { [key: string]: any }) {
+  return request<API.LocationItem>(`/api/v1/locations/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 编辑门店营业时间 PATCH /api/v1/locations/:id/hours */
+export async function updateLocationHours(id: string, hours: API.LocationHoursInput[], options?: { [key: string]: any }) {
+  return request<API.LocationItem>(`/api/v1/locations/${id}/hours`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    data: { hours },
+    ...(options || {}),
+  });
+}
+
+// ===== Service Category API =====
+
+/** 创建服务分类 POST /api/v1/service-categories */
+export async function createServiceCategory(data: API.CreateServiceCategoryParams, options?: { [key: string]: any }) {
+  return request<API.ServiceCategoryItem>('/api/v1/service-categories', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 更新服务分类 PATCH /api/v1/service-categories/:id */
+export async function updateServiceCategory(id: string, data: API.UpdateServiceCategoryParams, options?: { [key: string]: any }) {
+  return request<API.ServiceCategoryItem>(`/api/v1/service-categories/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+// ===== Service API =====
+
+/** 创建服务 POST /api/v1/services */
+export async function createService(data: API.CreateServiceParams, options?: { [key: string]: any }) {
+  return request<API.ServiceItem>('/api/v1/services', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 更新服务 PATCH /api/v1/services/:id */
+export async function updateService(id: string, data: API.UpdateServiceParams, options?: { [key: string]: any }) {
+  return request<API.ServiceItem>(`/api/v1/services/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 激活服务 POST /api/v1/services/:id/activate */
+export async function activateService(id: string, data: API.ActivateServiceParams, options?: { [key: string]: any }) {
+  return request<{ serviceId: string; locationId: string; active: boolean }>(`/api/v1/services/${id}/activate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 停用服务 POST /api/v1/services/:id/deactivate */
+export async function deactivateService(id: string, data: API.ActivateServiceParams, options?: { [key: string]: any }) {
+  return request<{ serviceId: string; locationId: string; active: boolean }>(`/api/v1/services/${id}/deactivate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+// ===== Service Overlap Config API =====
+
+/** 获取服务默认 overlap 配置 GET /api/v1/services/:id/overlap-config */
+export async function getOverlapConfig(serviceId: string, options?: { [key: string]: any }) {
+  return request<API.OverlapConfig | null>(`/api/v1/services/${serviceId}/overlap-config`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 获取服务 location 覆盖 overlap 配置 GET /api/v1/services/:id/overlap-config/:locationId */
+export async function getOverlapConfigForLocation(serviceId: string, locationId: string, options?: { [key: string]: any }) {
+  return request<API.OverlapConfig | null>(`/api/v1/services/${serviceId}/overlap-config/${locationId}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 创建/更新服务默认 overlap 配置 PUT /api/v1/services/:id/overlap-config */
+export async function upsertOverlapConfig(serviceId: string, data: { staffFreeHead: number; staffFreeTail: number }, options?: { [key: string]: any }) {
+  return request<API.OverlapConfig>(`/api/v1/services/${serviceId}/overlap-config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 创建/更新服务 location 覆盖 overlap 配置 PUT /api/v1/services/:id/overlap-config/:locationId */
+export async function upsertOverlapConfigForLocation(serviceId: string, locationId: string, data: { staffFreeHead: number; staffFreeTail: number }, options?: { [key: string]: any }) {
+  return request<API.OverlapConfig>(`/api/v1/services/${serviceId}/overlap-config/${locationId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 删除服务 location 覆盖 overlap 配置 DELETE /api/v1/services/:id/overlap-config/:locationId */
+export async function deleteOverlapConfigForLocation(serviceId: string, locationId: string, options?: { [key: string]: any }) {
+  return request(`/api/v1/services/${serviceId}/overlap-config/${locationId}`, {
+    method: 'DELETE',
+    ...(options || {}),
+  });
+}
+
+// ===== Shift API =====
+
+/** 获取排班列表 GET /api/v1/shifts */
+export async function getShifts(params?: { page?: number; limit?: number }, options?: { [key: string]: any }) {
+  return request<API.ShiftList>('/api/v1/shifts', {
+    method: 'GET',
+    params: { page: params?.page || 1, limit: params?.limit || 100 },
+    ...(options || {}),
+  });
+}
+
+/** 获取排班详情 GET /api/v1/shifts/:id */
+export async function getShift(id: string, options?: { [key: string]: any }) {
+  return request<API.ShiftItem>(`/api/v1/shifts/${id}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 按员工+门店查询排班 GET /api/v1/shifts/staff/:staffId/location/:locationId */
+export async function getShiftsByStaffAndLocation(staffId: string, locationId: string, options?: { [key: string]: any }) {
+  return request<API.ShiftItem[]>(`/api/v1/shifts/staff/${staffId}/location/${locationId}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 创建排班 POST /api/v1/shifts */
+export async function createShift(data: API.CreateShiftParams, options?: { [key: string]: any }) {
+  return request<API.ShiftItem>('/api/v1/shifts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 取消发布排班 POST /api/v1/shifts/unpublish */
+export async function unpublishShift(data: API.UnpublishShiftParams, options?: { [key: string]: any }) {
+  return request('/api/v1/shifts/unpublish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+// ===== Timeblock API =====
+
+/** 获取时间块列表 GET /api/v1/timeblocks */
+export async function getTimeblocks(params?: { page?: number; limit?: number }, options?: { [key: string]: any }) {
+  return request<API.TimeblockList>('/api/v1/timeblocks', {
+    method: 'GET',
+    params: { page: params?.page || 1, limit: params?.limit || 10 },
+    ...(options || {}),
+  });
+}
+
+/** 获取时间块详情 GET /api/v1/timeblocks/:id */
+export async function getTimeblock(id: string, options?: { [key: string]: any }) {
+  return request<API.TimeblockItem>(`/api/v1/timeblocks/${id}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 创建时间块 POST /api/v1/timeblocks */
+export async function createTimeblock(data: API.CreateTimeblockParams, options?: { [key: string]: any }) {
+  return request<API.TimeblockItem>('/api/v1/timeblocks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 删除时间块 DELETE /api/v1/timeblocks/:id */
+export async function deleteTimeblock(id: string, options?: { [key: string]: any }) {
+  return request(`/api/v1/timeblocks/${id}`, {
+    method: 'DELETE',
+    ...(options || {}),
+  });
+}
+
+// ===== Employee API =====
+
+/** 获取员工列表 GET /api/v1/employees */
+export async function getEmployees(
+  params: {
+    page?: number;
+    limit?: number;
+    active?: boolean;
+    name?: string;
+  },
+  options?: { [key: string]: any },
+) {
+  return request<API.EmployeeList>('/api/v1/employees', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** 创建员工 POST /api/v1/employees */
+export async function createEmployee(data: API.CreateEmployeeParams, options?: { [key: string]: any }) {
+  return request<API.EmployeeItem>('/api/v1/employees', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 更新员工 PATCH /api/v1/employees/:id */
+export async function updateEmployee(id: string, data: API.UpdateEmployeeParams, options?: { [key: string]: any }) {
+  return request<API.EmployeeItem>(`/api/v1/employees/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 删除员工 DELETE /api/v1/employees/:id */
+export async function deleteEmployee(id: string, options?: { [key: string]: any }) {
+  return request<void>(`/api/v1/employees/${id}`, {
+    method: 'DELETE',
     ...(options || {}),
   });
 }

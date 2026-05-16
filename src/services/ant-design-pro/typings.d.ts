@@ -167,6 +167,24 @@ declare namespace API {
     total: number;
   };
 
+  type CreateClientParams = {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    mobilePhone?: string;
+    dob?: string;
+    pronoun?: string;
+  };
+
+  type UpdateClientParams = {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    mobilePhone?: string;
+    dob?: string;
+    pronoun?: string;
+  };
+
   type StaffItem = {
     id: string;
     email?: string | null;
@@ -245,6 +263,8 @@ declare namespace API {
     createdAt: string;
     cancelled: boolean;
     staffId: string;
+    employeeId?: string | null;
+    employee?: { id: string; firstName: string; lastName: string | null } | null;
     clientId?: string | null;
     locationId?: string | null;
     endAt?: string | null;
@@ -302,29 +322,6 @@ declare namespace API {
     total: number;
   };
 
-  type ServiceItem = {
-    id: string;
-    name: string;
-    active: boolean;
-    addon: boolean;
-    createdAt: string;
-    updatedAt: string;
-    defaultDuration: number;
-    defaultPrice: number;
-    categoryId?: string | null;
-    custom?: Record<string, any> | null;
-    customFields?: Record<string, any>[] | null;
-    keys?: string[] | null;
-    addons?: Record<string, any>[] | null;
-    category?: Record<string, any> | null;
-    description?: string | null;
-    externalId?: string | null;
-    serviceOptionGroups?: Record<string, any>[] | null;
-    serviceOverrides?: Record<string, any> | null;
-    serviceStatus?: Record<string, any> | null;
-    sortPath?: Record<string, any> | null;
-  };
-
   type ServiceCategoryItem = {
     id: string;
     name: string;
@@ -335,20 +332,11 @@ declare namespace API {
     sortPath?: Record<string, any> | null;
   };
 
-  type ServiceCategoryList = {
-    data: ServiceCategoryItem[];
-    total: number;
-  };
-
-  type ServiceList = {
-    data: ServiceItem[];
-    total: number;
-  };
-
   type CreateAppointmentParams = {
     id?: string;
     clientId: string;
     staffId: string;
+    employeeId?: string | null;
     startAt: string;
     createdAt?: string;
     cancelled: boolean;
@@ -440,6 +428,7 @@ declare namespace API {
     services: {
       serviceId: string;
       staffId: string | null;
+      employeeId?: string | null;
       startTimeOffset: number;
       resources?: Record<string, any>[];
     }[];
@@ -463,6 +452,7 @@ declare namespace API {
     staffId: string;
     staffName: string;
     availableSlots: AvailableSlot[];
+    compressedSlots?: AvailableSlot[];
   };
 
   type AvailableStaff = {
@@ -489,4 +479,250 @@ declare namespace API {
     | 'ACTIVE'
     | 'FINAL'
     | 'CANCELLED';
+
+  // ===== Location Hours Types =====
+  type LocationHoursInput = {
+    open: boolean;
+    start: { hour: number; min: number };
+    finish: { hour: number; min: number };
+  };
+
+  type UpdateLocationParams = {
+    coordinates?: { latitude: number; longitude: number };
+    externalId?: string;
+  };
+
+  // ===== Service Category Types =====
+  type ServiceCategoryItem = {
+    id: string;
+    name: string;
+    active: boolean;
+    sortPath?: string | null;
+    services?: Record<string, any> | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  type ServiceCategoryList = {
+    data: ServiceCategoryItem[];
+    hasNextPage: boolean;
+  };
+
+  type CreateServiceCategoryParams = {
+    name: string;
+  };
+
+  type UpdateServiceCategoryParams = {
+    name?: string;
+  };
+
+  // ===== Service Types =====
+  type ServiceItem = {
+    id: string;
+    name: string;
+    active: boolean;
+    addon: boolean;
+    description?: string | null;
+    externalId?: string | null;
+    categoryId: string;
+    category: { id: string; name: string };
+    defaultDuration: number;
+    defaultPrice: number;
+    sortPath: string;
+    custom?: Record<string, any>;
+    customFields?: Record<string, any>[];
+    serviceStatus?: { active: boolean; bookable: boolean };
+    serviceOverrides?: Record<string, any>;
+    serviceOptionGroups?: Record<string, any>[];
+    addons?: Record<string, any>[];
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  type ServiceList = {
+    data: ServiceItem[];
+    total: number;
+  };
+
+  type CreateServiceParams = {
+    name: string;
+    categoryId: string;
+    addon?: boolean;
+    description?: string;
+    externalId?: string;
+  };
+
+  type UpdateServiceParams = {
+    name?: string;
+    categoryId?: string;
+    addon?: boolean;
+    description?: string;
+    externalId?: string;
+    customFields?: { key: string; textValue?: string; booleanValue?: boolean; integerValue?: number; floatValue?: number }[];
+  };
+
+  type ActivateServiceParams = {
+    locationId: string;
+  };
+
+  // ===== Overlap Config Types =====
+  type OverlapConfig = {
+    id: string;
+    serviceId: string;
+    locationId: string | null;
+    staffFreeHead: number;
+    staffFreeTail: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  // ===== Shift Types =====
+  type ShiftItem = {
+    id: string;
+    available: boolean;
+    day?: number | null;
+    clockIn?: string | null;
+    clockOut?: string | null;
+    locationId: string;
+    bookingInterval?: number | null;
+    recurrence?: string | null;
+    recurrenceEnd?: string | null;
+    recurrenceInterval?: number | null;
+    recurrenceStart?: string | null;
+    resourceId?: string | null;
+    staffId?: string | null;
+    unavailableReason?: string | null;
+  };
+
+  type ShiftList = {
+    data: ShiftItem[];
+    hasNextPage: boolean;
+  };
+
+  type CreateShiftParams = {
+    staffId: string;
+    locationId: string;
+    available: boolean;
+    day?: number | null;
+    clockIn: string;
+    clockOut: string;
+    bookingInterval?: number | null;
+    recurrence?: string | null;
+    recurrenceEnd?: string | null;
+    recurrenceInterval?: number | null;
+    recurrenceStart?: string | null;
+    resourceId?: string | null;
+    unavailableReason?: string | null;
+  };
+
+  type UnpublishShiftParams = {
+    staffId: string;
+    locationId: string;
+    day: number;
+    startIso8601: string;
+    endIso8601?: string;
+  };
+
+  // ===== Timeblock Types =====
+  type TimeblockItem = {
+    id: string;
+    cancelled?: boolean | null;
+    duration: number;
+    endAt: string;
+    location: { id: string; name?: string };
+    reason?: 'BUSINESS' | 'PERSONAL' | null;
+    staff: { id: string; firstName?: string; lastName?: string; displayName?: string };
+    staffId: string;
+    startAt: string;
+    title?: string | null;
+  };
+
+  type TimeblockList = {
+    data: TimeblockItem[];
+    hasNextPage: boolean;
+  };
+
+  type CreateTimeblockParams = {
+    staffId: string;
+    locationId: string;
+    startTime: string;
+    duration: number;
+    title?: string;
+    reason?: 'BUSINESS' | 'PERSONAL';
+    recurring?: {
+      frequency: string;
+      interval: number;
+      endAfter?: { count?: number; datetime?: string };
+    };
+  };
+
+  // ===== Employee Types =====
+
+  type EmployeeItem = {
+    id: string;
+    firstName: string;
+    lastName?: string | null;
+    mobilePhone?: string | null;
+    email?: string | null;
+    active: boolean;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  type EmployeeList = {
+    data: EmployeeItem[];
+    total: number;
+  };
+
+  type CreateEmployeeParams = {
+    firstName: string;
+    lastName?: string;
+    mobilePhone?: string;
+    email?: string;
+  };
+
+  type UpdateEmployeeParams = {
+    firstName?: string;
+    lastName?: string | null;
+    mobilePhone?: string | null;
+    email?: string | null;
+    active?: boolean;
+  };
+
+  type CheckoutRequest = {
+    staffId: string;
+    notifyClient?: boolean;
+    gratuity?: { amount: number; staffId: string };
+    products?: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      sellerId?: string;
+    }>;
+    payment?: { sourceId: string; amount: number; currency?: string };
+  };
+
+  type CheckoutResponse = {
+    appointment: API.AppointmentItem;
+    order: {
+      id: string;
+      appointmentId: string;
+      state: string;
+      totalAmount: number;
+      serviceLines: any[];
+      productLines: any[] | null;
+      gratuityAmount: number;
+      subtotal: number;
+      discountAmount: number;
+      taxAmount: number;
+    };
+    payment: {
+      id: string;
+      status: string;
+      amount: number;
+      method: string;
+      cardBrand: string | null;
+      cardLast4: string | null;
+    } | null;
+  };
 }

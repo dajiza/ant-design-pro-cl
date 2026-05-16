@@ -173,5 +173,7 @@ export default defineConfig({
   exportStatic: {},
   define: {
     'process.env.CI': process.env.CI,
+    SQUARE_APPLICATION_ID: process.env.SQUARE_APPLICATION_ID || '',
+    SQUARE_LOCATION_ID: process.env.SQUARE_LOCATION_ID || '',
   },
 });

@@ -3,17 +3,32 @@ import type { ProColumns } from '@ant-design/pro-components';
 import { PageContainer } from '@ant-design/pro-components';
 import ProTable from '@ant-design/pro-table';
 import { history } from '@umijs/max';
-import { Button, message } from 'antd';
+import { Button } from 'antd';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
 import React, { useRef } from 'react';
-import { getAppointments } from '@/services/ant-design-pro/api';
+import CheckoutModal from '@/pages/kanban/components/CheckoutModal';
+import {
+  getAppointments,
+  getEmployees,
+  getLocations,
+} from '@/services/ant-design-pro/api';
 import AppointmentDrawer from './components/AppointmentDrawer';
 import AppointmentStateBadge from './components/AppointmentStateBadge';
 
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 const AppointmentList: React.FC = () => {
   const actionRef = useRef<any>();
+  const [_locations, setLocations] = React.useState<API.LocationItem[]>([]);
   const [selectedAppointment, setSelectedAppointment] =
     React.useState<API.AppointmentItem | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [checkoutModalOpen, setCheckoutModalOpen] = React.useState(false);
+  const [checkoutAppointment, setCheckoutAppointment] =
+    React.useState<API.AppointmentItem | null>(null);
 
   const getClientName = (record: API.AppointmentItem) => {
     return (
@@ -31,6 +46,13 @@ const AppointmentList: React.FC = () => {
     );
   };
 
+  const getEmployeeName = (record: API.AppointmentItem) => {
+    if (record.employee) {
+      return `${record.employee.firstName}${record.employee.lastName ? ' ' + record.employee.lastName : ''}`;
+    }
+    return '-';
+  };
+
   const getServiceNames = (record: API.AppointmentItem) => {
     const services = (record.appointmentServices as any[]) || [];
     return (
@@ -46,6 +68,13 @@ const AppointmentList: React.FC = () => {
       sorter: true,
       hideInSearch: false,
       width: 180,
+      render: (_, record) => {
+        const tz = (record.location as any)?.tz || 'UTC';
+        const utc = record.startAt?.endsWith('Z')
+          ? record.startAt
+          : `${record.startAt}Z`;
+        return dayjs(utc).tz(tz).format('YYYY-MM-DD HH:mm:ss');
+      },
     },
     {
       title: '状态',
@@ -74,10 +103,25 @@ const AppointmentList: React.FC = () => {
       width: 120,
     },
     {
-      title: '员工',
+      title: '房间',
       hideInSearch: true,
       render: (_, record) => getStaffNames(record),
       width: 120,
+    },
+    {
+      title: '技师',
+      dataIndex: 'employeeId',
+      hideInSearch: false,
+      render: (_, record) => getEmployeeName(record),
+      width: 100,
+      valueType: 'select',
+      request: async () => {
+        const res = await getEmployees({ limit: 100, active: true });
+        return (res.data || []).map((e: API.EmployeeItem) => ({
+          label: `${e.firstName}${e.lastName ? ' ' + e.lastName : ''}`,
+          value: e.id,
+        }));
+      },
     },
     {
       title: '服务',
@@ -88,10 +132,19 @@ const AppointmentList: React.FC = () => {
     },
     {
       title: '门店',
-      hideInSearch: true,
+      dataIndex: 'locationId',
       render: (_, record) =>
         (record.location as any)?.name || record.locationId || '-',
       width: 120,
+      valueType: 'select',
+      request: async () => {
+        const res = await getLocations({ limit: 100 });
+        setLocations(res.data);
+        return (res.data || []).map((l: API.LocationItem) => ({
+          label: l.name,
+          value: l.id,
+        }));
+      },
     },
     {
       title: '时长',
@@ -110,6 +163,32 @@ const AppointmentList: React.FC = () => {
         false: { text: '否', status: 'Success' },
       },
       width: 80,
+    },
+    {
+      title: '操作',
+      hideInSearch: true,
+      width: 80,
+      render: (_, record) => {
+        const checkoutable =
+          !record.cancelled &&
+          ['BOOKED', 'CONFIRMED', 'ARRIVED', 'ACTIVE'].includes(
+            record.state || '',
+          );
+        if (!checkoutable) return null;
+        return (
+          <Button
+            type="link"
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCheckoutAppointment(record);
+              setCheckoutModalOpen(true);
+            }}
+          >
+            结账
+          </Button>
+        );
+      },
     },
   ];
 
@@ -133,6 +212,8 @@ const AppointmentList: React.FC = () => {
           const response = await getAppointments({
             page: params.current,
             limit: params.pageSize,
+            locationId: params.locationId,
+            employeeId: params.employeeId,
             state: params.state,
             startDate: params.startAt ? String(params.startAt) : undefined,
             cancelled:
@@ -165,6 +246,19 @@ const AppointmentList: React.FC = () => {
         appointment={selectedAppointment}
         onClose={() => setDrawerOpen(false)}
         onRefresh={() => actionRef.current?.reload()}
+      />
+      <CheckoutModal
+        open={checkoutModalOpen}
+        appointment={checkoutAppointment}
+        onClose={() => {
+          setCheckoutModalOpen(false);
+          setCheckoutAppointment(null);
+        }}
+        onSuccess={() => {
+          setCheckoutModalOpen(false);
+          setCheckoutAppointment(null);
+          actionRef.current?.reload();
+        }}
       />
     </PageContainer>
   );

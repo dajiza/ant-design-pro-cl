@@ -40,6 +40,7 @@
     "@fullcalendar/core": "^6.1.20",
     "@fullcalendar/daygrid": "^6.1.20",
     "@fullcalendar/interaction": "^6.1.20",
+    "@fullcalendar/moment-timezone": "^6.1.20",
     "@fullcalendar/react": "^6.1.20",
     "@fullcalendar/resource": "^6.1.20",
     "@fullcalendar/resource-timegrid": "^6.1.20",
@@ -49,8 +50,11 @@
     "antd-style": "^4.1.0",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.19",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.5.40",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "react-square-web-payments-sdk": "^3.3.0"
   },
   "devDependencies": {
     "@ant-design/pro-cli": "^3.3.0",

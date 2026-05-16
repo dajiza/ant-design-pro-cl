@@ -98,6 +98,12 @@ export default [
     ],
   },
   {
+    path: '/clients',
+    name: 'clients',
+    icon: 'team',
+    component: './clients',
+  },
+  {
     path: '/rooms',
     name: 'rooms',
     icon: 'home',
@@ -138,8 +144,44 @@ export default [
     component: './staff',
   },
   {
+    path: '/employees',
+    name: 'employees',
+    icon: 'user',
+    component: './employees',
+  },
+  {
+    path: '/locations',
+    name: 'locations',
+    icon: 'environment',
+    component: './locations',
+  },
+  {
+    path: '/service-categories',
+    name: 'service-categories',
+    icon: 'appstore',
+    component: './service-categories',
+  },
+  {
+    path: '/services',
+    name: 'services',
+    icon: 'scissor',
+    component: './services',
+  },
+  {
+    path: '/shifts',
+    name: 'shifts',
+    icon: 'schedule',
+    component: './shifts',
+  },
+  {
+    path: '/timeblocks',
+    name: 'timeblocks',
+    icon: 'stop',
+    component: './timeblocks',
+  },
+  {
     path: '/kanban',
-    name: 'kanban',
+    name: 'front-desk',
     icon: 'appstore',
     component: './kanban',
   },
