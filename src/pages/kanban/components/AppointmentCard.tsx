@@ -115,6 +115,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       {...provided.dragHandleProps}
       size="small"
       style={{
+        ...provided.draggableProps.style,
         borderLeft: `3px solid ${borderColor}`,
         cursor: 'grab',
         opacity: isCancelled ? 0.5 : snapshot.isDragging ? 0.8 : 1,
