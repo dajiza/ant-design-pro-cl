@@ -24,7 +24,7 @@ interface CheckoutModalProps {
   onSuccess: (result: API.CheckoutResponse) => void;
 }
 
-type PaymentMethod = 'card' | 'cash' | 'other';
+type PaymentMethod = 'card' | 'cash' | 'other' | 'none';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -196,6 +196,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [tipStaffId, setTipStaffId] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
+  const [discountMode, setDiscountMode] = useState<'none' | 'fixed' | 'percent'>('none');
+  const [discountAmount, setDiscountAmount] = useState<number | null>(null);
+  const [discountPercent, setDiscountPercent] = useState<number | null>(null);
+  const [discountReason, setDiscountReason] = useState('');
+  const [taxAmount, setTaxAmount] = useState<number | null>(null);
 
   // Reset on close
   const handleClose = useCallback(() => {
@@ -205,6 +210,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setTipStaffId('');
     setNotes('');
     setPaymentMethod('card');
+    setDiscountMode('none');
+    setDiscountAmount(null);
+    setDiscountPercent(null);
+    setDiscountReason('');
+    setTaxAmount(null);
     onClose();
   }, [onClose]);
 
@@ -256,7 +266,24 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return 0;
   }, [customTipDollars, tipPercent, subtotalCents]);
 
-  const totalCents = subtotalCents + tipCents;
+  const discountCents = useMemo(() => {
+    if (discountMode === 'fixed' && discountAmount != null && discountAmount > 0) {
+      return Math.min(dollarsToCents(discountAmount), subtotalCents);
+    }
+    if (discountMode === 'percent' && discountPercent != null && discountPercent > 0) {
+      return Math.round(subtotalCents * (discountPercent / 100));
+    }
+    return 0;
+  }, [discountMode, discountAmount, discountPercent, subtotalCents]);
+
+  const taxCents = useMemo(() => {
+    if (taxAmount != null && taxAmount > 0) {
+      return dollarsToCents(taxAmount);
+    }
+    return 0;
+  }, [taxAmount]);
+
+  const totalCents = subtotalCents - discountCents + tipCents + taxCents;
 
   const clientName = useMemo(() => {
     if (!appointment?.client) return '';
@@ -286,13 +313,42 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           };
         }
 
-        // Payment (only for credit card with a token)
+        // Discount
+        if (discountCents > 0) {
+          if (discountMode === 'fixed' && discountAmount != null) {
+            req.discount = { amount: discountCents };
+          } else if (discountMode === 'percent' && discountPercent != null) {
+            req.discount = { percentage: discountPercent };
+          }
+          if (discountReason) {
+            req.discount = { ...req.discount!, reason: discountReason };
+          }
+        }
+
+        // Tax
+        if (taxCents > 0) {
+          req.taxAmount = taxCents;
+        }
+
+        // Payment
         if (paymentMethod === 'card' && sourceId) {
           req.payment = {
+            method: 'SQUARE_CARD',
             sourceId,
             amount: totalCents,
           };
+        } else if (paymentMethod === 'cash') {
+          req.payment = {
+            method: 'MANUAL_CASH',
+            amount: totalCents,
+          };
+        } else if (paymentMethod === 'other') {
+          req.payment = {
+            method: 'MANUAL_OTHER',
+            amount: totalCents,
+          };
         }
+        // paymentMethod === 'none' → no payment, order stays PENDING
 
         // Notes (not part of CheckoutRequest but kept for potential future use)
         void notes;
@@ -316,6 +372,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       effectiveTipStaffId,
       paymentMethod,
       totalCents,
+      discountCents,
+      discountMode,
+      discountAmount,
+      discountPercent,
+      discountReason,
+      taxCents,
       notes,
       onSuccess,
       handleClose,
@@ -413,6 +475,68 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 })
               )}
 
+              {/* Discount section */}
+              <Divider className={styles.divider} />
+              <div className={styles.sectionTitle}>折扣</div>
+              <Radio.Group
+                value={discountMode}
+                onChange={(e) => {
+                  setDiscountMode(e.target.value);
+                  setDiscountAmount(null);
+                  setDiscountPercent(null);
+                }}
+                size="small"
+                style={{ marginBottom: 8 }}
+              >
+                <Radio.Button value="none">无折扣</Radio.Button>
+                <Radio.Button value="fixed">固定金额</Radio.Button>
+                <Radio.Button value="percent">百分比</Radio.Button>
+              </Radio.Group>
+              {discountMode === 'fixed' && (
+                <InputNumber
+                  placeholder="折扣金额 ($)"
+                  min={0}
+                  max={subtotalCents / 100}
+                  precision={2}
+                  style={{ width: '100%' }}
+                  value={discountAmount}
+                  onChange={(val) => setDiscountAmount(val ?? null)}
+                />
+              )}
+              {discountMode === 'percent' && (
+                <InputNumber
+                  placeholder="折扣百分比 (%)"
+                  min={0}
+                  max={100}
+                  precision={0}
+                  style={{ width: '100%' }}
+                  value={discountPercent}
+                  onChange={(val) => setDiscountPercent(val ?? null)}
+                  addonAfter="%"
+                />
+              )}
+              {discountMode !== 'none' && (
+                <Input
+                  placeholder="折扣原因（可选）"
+                  style={{ marginTop: 8 }}
+                  value={discountReason}
+                  onChange={(e) => setDiscountReason(e.target.value)}
+                />
+              )}
+
+              {/* Tax section */}
+              <Divider className={styles.divider} />
+              <div className={styles.sectionTitle}>税费</div>
+              <InputNumber
+                placeholder="税费金额 ($)"
+                min={0}
+                max={9999}
+                precision={2}
+                style={{ width: '100%' }}
+                value={taxAmount}
+                onChange={(val) => setTaxAmount(val ?? null)}
+              />
+
               <Divider className={styles.divider} />
 
               {/* Tip section */}
@@ -471,6 +595,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     { label: '信用卡', value: 'card' },
                     { label: '现金', value: 'cash' },
                     { label: '其他', value: 'other' },
+                    { label: '无支付', value: 'none' },
                   ]}
                 />
               </div>
@@ -517,11 +642,27 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   {formatCents(subtotalCents)}
                 </span>
               </div>
+              {discountCents > 0 && (
+                <div className={styles.summaryRow}>
+                  <span className={styles.summaryLabel}>折扣</span>
+                  <span className={styles.summaryValue} style={{ color: '#52c41a' }}>
+                    -{formatCents(discountCents)}
+                  </span>
+                </div>
+              )}
               {tipCents > 0 && (
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryLabel}>小费</span>
                   <span className={styles.summaryValue}>
                     {formatCents(tipCents)}
+                  </span>
+                </div>
+              )}
+              {taxCents > 0 && (
+                <div className={styles.summaryRow}>
+                  <span className={styles.summaryLabel}>税费</span>
+                  <span className={styles.summaryValue}>
+                    {formatCents(taxCents)}
                   </span>
                 </div>
               )}
@@ -552,13 +693,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   onClick={handleCashOrOtherSubmit}
                   style={{ marginTop: 16 }}
                 >
-                  {loading ? '处理中...' : '确认结账'}
+                  {loading ? '处理中...' : paymentMethod === 'none' ? '确认结账（无支付）' : '确认结账'}
                 </button>
               )}
 
-              {paymentMethod !== 'card' && (
+              {paymentMethod === 'none' && (
                 <div className={styles.noPaymentHint}>
-                  不选择信用卡支付将直接完成预约，不产生扣费
+                  不收取费用，订单将标记为待支付
+                </div>
+              )}
+              {paymentMethod !== 'card' && paymentMethod !== 'none' && (
+                <div className={styles.noPaymentHint}>
+                  确认后将记录为{paymentMethod === 'cash' ? '现金' : '其他方式'}收款
                 </div>
               )}
             </div>
