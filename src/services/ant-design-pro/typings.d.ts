@@ -212,6 +212,7 @@ declare namespace API {
     staffRoleId?: string | null;
     suspended?: boolean | null;
     updatedAt?: string | null;
+    hexColor?: string | null;
   };
 
   type StaffList = {
@@ -228,6 +229,7 @@ declare namespace API {
     mobilePhone?: string;
     bio?: string;
     externalNickname?: string;
+    hexColor?: string;
   };
 
   type UpdateStaffParams = {
@@ -240,6 +242,7 @@ declare namespace API {
     externalNickname?: string;
     roleId?: string;
     enabledForFutureLocations?: boolean;
+    hexColor?: string;
   };
 
   type UpdateStaffLocationParams = {
@@ -430,6 +433,8 @@ declare namespace API {
       staffId: string | null;
       employeeId?: string | null;
       startTimeOffset: number;
+      startAt?: string | null;
+      endAt?: string | null;
       resources?: Record<string, any>[];
     }[];
     startAt: string | null;
@@ -639,7 +644,7 @@ declare namespace API {
 
   type TimeblockList = {
     data: TimeblockItem[];
-    hasNextPage: boolean;
+    total: number;
   };
 
   type CreateTimeblockParams = {
@@ -699,30 +704,59 @@ declare namespace API {
       unitPrice: number;
       sellerId?: string;
     }>;
-    payment?: { sourceId: string; amount: number; currency?: string };
+    discount?: {
+      amount?: number;
+      percentage?: number;
+      reason?: string;
+    };
+    taxAmount?: number;
+    payment?: {
+      method: 'SQUARE_CARD' | 'MANUAL_CASH' | 'MANUAL_OTHER';
+      amount: number;
+      sourceId?: string;
+      currency?: string;
+    };
   };
 
   type CheckoutResponse = {
     appointment: API.AppointmentItem;
     order: {
       id: string;
+      number: string | null;
       appointmentId: string;
       state: string;
-      totalAmount: number;
-      serviceLines: any[];
-      productLines: any[] | null;
-      gratuityAmount: number;
-      subtotal: number;
-      discountAmount: number;
-      taxAmount: number;
+      clientId: string | null;
+      locationId: string | null;
+      staffId: string | null;
+      gratuityStaffId: string | null;
+      note: string | null;
+      initialSubtotal: number;
+      initialDiscountAmount: number;
+      initialFeeAmount: number;
+      initialGratuityAmount: number;
+      initialTaxAmount: number;
+      initialTotal: number;
+      currentSubtotal: number;
+      currentDiscountAmount: number;
+      currentFeeAmount: number;
+      currentGratuityAmount: number;
+      currentTaxAmount: number;
+      currentTotal: number;
+      refundAmount: number;
+      lineGroups: any | null;
+      paymentGroups: any | null;
     };
     payment: {
       id: string;
-      status: string;
       amount: number;
+      currency: string;
       method: string;
+      source: string;
+      status: string;
+      squarePaymentId: string | null;
       cardBrand: string | null;
       cardLast4: string | null;
+      refundAmount: number;
     } | null;
   };
 }
