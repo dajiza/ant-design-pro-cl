@@ -241,22 +241,20 @@ const Kanban: React.FC = () => {
   // =========================
   const handleCheckoutSuccess = useCallback((res: API.CheckoutResponse) => {
     const aptId = res?.appointment?.id;
-    const totalAmount = res?.order?.totalAmount ?? null;
+    const totalAmount = res?.order?.currentTotal ?? null;
 
     if (aptId) {
-      // Update local state to FINAL
       setAppointments((prev) =>
         prev.map((a) => (a.id === aptId ? { ...a, state: 'FINAL' } : a)),
       );
 
-      // Record checkout amount
       if (totalAmount != null) {
         setCheckoutAmounts((prev) => ({ ...prev, [aptId]: totalAmount }));
       }
 
-      // Track if payment is still pending (no credit card payment captured)
-      const hasPayment = res?.payment != null;
-      if (!hasPayment) {
+      const hasCompletedPayment =
+        res?.payment != null && res.payment.status === 'COMPLETED';
+      if (!hasCompletedPayment) {
         setCheckoutPendingSet((prev) => new Set(prev).add(aptId));
       }
     }
