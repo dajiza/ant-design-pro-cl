@@ -3,35 +3,57 @@
 
 declare namespace API {
   type CurrentUser = {
-    id?: number;
+    id?: string;
     name?: string;
-    avatar?: string;
-    userid?: string;
     email?: string;
-    firstName?: string;
-    lastName?: string;
-    signature?: string;
-    title?: string;
-    group?: string;
-    tags?: { key?: string; label?: string }[];
-    notifyCount?: number;
-    unreadCount?: number;
-    country?: string;
+    roles?: string[];
+    permissions?: string[];
+    at?: number;
     access?: string;
-    role?: { id?: number };
-    geographic?: {
-      province?: { label?: string; key?: string };
-      city?: { label?: string; key?: string };
-    };
-    address?: string;
-    phone?: string;
   };
 
-  type LoginResult = {
-    token?: string;
-    refreshToken?: string;
-    tokenExpires?: number;
-    user?: CurrentUser;
+  type SendCodeParams = {
+    mail: string;
+    actionType: 'LOGIN' | 'REGISTER' | 'RESET_PASSWORD';
+  };
+
+  type VerifyCodeParams = {
+    verificationCodeId: string;
+    code: string;
+  };
+
+  type SendCodeResult = {
+    success: boolean;
+    message: string;
+    verificationCodeId: string;
+  };
+
+  type VerifyCodeResult = {
+    token: string;
+    tokenBefore: string;
+  };
+
+  type LoginResult = VerifyCodeResult;
+
+  type LoginWithPasswordParams = {
+    email: string;
+    password: string;
+  };
+
+  type ResetPasswordParams = {
+    verificationCodeId: string;
+    code: string;
+    newPassword: string;
+  };
+
+  type ChangePasswordParams = {
+    currentPassword: string;
+    newPassword: string;
+  };
+
+  type FakeCaptcha = {
+    code?: number;
+    status?: string;
   };
 
   type PageParams = {
@@ -59,25 +81,6 @@ declare namespace API {
     /** 列表的内容总数 */
     total?: number;
     success?: boolean;
-  };
-
-  type FakeCaptcha = {
-    code?: number;
-    status?: string;
-  };
-
-  type LoginParams = {
-    email?: string;
-    password?: string;
-    autoLogin?: boolean;
-    type?: string;
-  };
-
-  type RegisterParams = {
-    email?: string;
-    password?: string;
-    firstName?: string;
-    lastName?: string;
   };
 
   type ErrorResponse = {
@@ -436,6 +439,7 @@ declare namespace API {
       startAt?: string | null;
       endAt?: string | null;
       resources?: Record<string, any>[];
+      addons?: { serviceId: string; staffId?: string }[];
     }[];
     startAt: string | null;
     notes: string | null;
@@ -539,7 +543,7 @@ declare namespace API {
     serviceStatus?: { active: boolean; bookable: boolean };
     serviceOverrides?: Record<string, any>;
     serviceOptionGroups?: Record<string, any>[];
-    addons?: Record<string, any>[];
+    addons?: Record<string, any>;
     createdAt: string;
     updatedAt: string;
   };
@@ -629,14 +633,27 @@ declare namespace API {
   };
 
   // ===== Timeblock Types =====
+
+  /** 时间块原因 */
+  type TimeblockReason = 'BUSINESS' | 'PERSONAL';
+
+  /** 时间块重复频率 */
+  type TimeblockRepeatFrequency = 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+
   type TimeblockItem = {
     id: string;
     cancelled?: boolean | null;
     duration: number;
     endAt: string;
-    location: { id: string; name?: string };
-    reason?: 'BUSINESS' | 'PERSONAL' | null;
-    staff: { id: string; firstName?: string; lastName?: string; displayName?: string };
+    location: { id: string; name?: string | null; tz?: string | null };
+    reason?: TimeblockReason | null;
+    staff: {
+      id: string;
+      name?: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      displayName?: string | null;
+    };
     staffId: string;
     startAt: string;
     title?: string | null;
@@ -647,15 +664,24 @@ declare namespace API {
     total: number;
   };
 
+  type TimeblockListParams = {
+    page?: number;
+    limit?: number;
+    locationId?: string;
+    staffId?: string;
+    startDate?: string;
+    endDate?: string;
+  };
+
   type CreateTimeblockParams = {
     staffId: string;
     locationId: string;
     startTime: string;
     duration: number;
     title?: string;
-    reason?: 'BUSINESS' | 'PERSONAL';
+    reason?: TimeblockReason;
     recurring?: {
-      frequency: string;
+      frequency: TimeblockRepeatFrequency;
       interval: number;
       endAfter?: { count?: number; datetime?: string };
     };
@@ -745,6 +771,8 @@ declare namespace API {
       refundAmount: number;
       lineGroups: any | null;
       paymentGroups: any | null;
+      createdAt: string;
+      updatedAt: string;
     };
     payment: {
       id: string;
@@ -757,6 +785,76 @@ declare namespace API {
       cardBrand: string | null;
       cardLast4: string | null;
       refundAmount: number;
+      orderId: string;
+      appointmentId: string;
+      createdAt: string;
+      updatedAt: string;
     } | null;
+  };
+
+  // ===== Deposit Types =====
+
+  type DepositOrderType = 'DEPOSIT' | 'PENALTY_AMOUNT' | 'OTHER';
+
+  type DepositStatus = 'INIT' | 'ING' | 'PAID' | 'CANCELED';
+
+  type DepositOrder = {
+    id: string;
+    locationId: string;
+    clientId: string;
+    amount: number;
+    orderType: DepositOrderType;
+    status: DepositStatus;
+    title: string;
+    memo: string | null;
+    appointmentId: string | null;
+    staffId: string | null;
+    paymentId: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  type DepositPayment = {
+    id: string;
+    depositId: string;
+    amount: number;
+    paymentLinkUrl: string | null;
+    squarePaymentLinkId: string | null;
+    squareOrderId: string | null;
+    squarePaymentResult: Record<string, any> | null;
+    status: DepositStatus;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  type CreateDepositParams = {
+    locationId: string;
+    clientId: string;
+    amount: number;
+    orderType: DepositOrderType;
+    title: string;
+    memo?: string;
+    appointmentId?: string;
+    staffId?: string;
+  };
+
+  type DepositListParams = {
+    locationId?: string;
+    clientId?: string;
+    appointmentId?: string;
+    status?: DepositStatus;
+    orderType?: DepositOrderType;
+    page?: number;
+    limit?: number;
+  };
+
+  type DepositDetailResponse = {
+    deposit: DepositOrder;
+    payment: DepositPayment | null;
+  };
+
+  type DepositListResponse = {
+    data: DepositOrder[];
+    total: number;
   };
 }

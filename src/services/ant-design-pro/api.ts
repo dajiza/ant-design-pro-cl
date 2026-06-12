@@ -2,25 +2,17 @@
 /* eslint-disable */
 import { request } from '@umijs/max';
 
-/** 获取当前的用户 GET /api/v1/auth/me */
+/** 获取当前的用户 GET /api/v1/dynamo-auth/me */
 export async function currentUser(options?: { [key: string]: any }) {
-  return request<API.CurrentUser>('/api/v1/auth/me', {
+  return request<API.CurrentUser>('/api/v1/dynamo-auth/me', {
     method: 'GET',
     ...(options || {}),
   });
 }
 
-/** 退出登录接口 POST /api/v1/auth/logout */
-export async function outLogin(options?: { [key: string]: any }) {
-  return request<Record<string, any>>('/api/v1/auth/logout', {
-    method: 'POST',
-    ...(options || {}),
-  });
-}
-
-/** 登录接口 POST /api/v1/auth/email/login */
-export async function login(body: API.LoginParams, options?: { [key: string]: any }) {
-  return request<API.LoginResult>('/api/v1/auth/email/login', {
+/** 发送验证码 POST /api/v1/dynamo-auth/send-code */
+export async function sendCode(body: API.SendCodeParams, options?: { [key: string]: any }) {
+  return request<API.SendCodeResult>('/api/v1/dynamo-auth/send-code', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -30,9 +22,45 @@ export async function login(body: API.LoginParams, options?: { [key: string]: an
   });
 }
 
-/** 注册接口 POST /api/v1/auth/email/register */
-export async function register(body: API.RegisterParams, options?: { [key: string]: any }) {
-  return request<void>('/api/v1/auth/email/register', {
+/** 验证码登录 POST /api/v1/dynamo-auth/verify-code */
+export async function verifyCode(body: API.VerifyCodeParams, options?: { [key: string]: any }) {
+  return request<API.VerifyCodeResult>('/api/v1/dynamo-auth/verify-code', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** 密码登录 POST /api/v1/dynamo-auth/login-with-password */
+export async function loginWithPassword(body: API.LoginWithPasswordParams, options?: { [key: string]: any }) {
+  return request<API.LoginResult>('/api/v1/dynamo-auth/login-with-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** 重置密码 POST /api/v1/dynamo-auth/reset-password-with-code */
+export async function resetPasswordWithCode(body: API.ResetPasswordParams, options?: { [key: string]: any }) {
+  return request<API.LoginResult>('/api/v1/dynamo-auth/reset-password-with-code', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
+/** 修改密码 POST /api/v1/dynamo-auth/change-password */
+export async function changePassword(body: API.ChangePasswordParams, options?: { [key: string]: any }) {
+  return request<{ success: boolean }>('/api/v1/dynamo-auth/change-password', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -111,6 +139,7 @@ export async function getClients(
     active?: boolean;
     name?: string;
     email?: string;
+    locationId?: string;
   },
   options?: { [key: string]: any },
 ) {
@@ -607,7 +636,7 @@ export async function bookingCreate(
   data: {
     locationId: string;
     clientId?: string;
-    services?: { serviceId: string; staffId?: string; employeeId?: string; startTimeOffset?: number }[];
+    services?: { serviceId: string; staffId?: string; employeeId?: string; startTimeOffset?: number; addons?: { serviceId: string; staffId?: string }[] }[];
     notes?: string;
     clientMessage?: string;
   },
@@ -637,7 +666,7 @@ export async function bookingUpdateSession(
   sessionId: string,
   data: {
     clientId?: string;
-    services?: { serviceId: string; staffId?: string; employeeId?: string; startTimeOffset?: number }[];
+    services?: { serviceId: string; staffId?: string; employeeId?: string; startTimeOffset?: number; startAt?: string; addons?: { serviceId: string; staffId?: string }[] }[];
     startAt?: string;
     notes?: string;
     clientMessage?: string;
@@ -685,6 +714,7 @@ export async function getAvailableDates(
     employeeId?: string;
     searchRangeLower?: string;
     searchRangeUpper?: string;
+    sessionId?: string;
   },
   options?: { [key: string]: any },
 ) {
@@ -703,6 +733,7 @@ export async function getAvailableTimes(
     date: string;
     staffId?: string;
     employeeId?: string;
+    sessionId?: string;
   },
   options?: { [key: string]: any },
 ) {
@@ -721,6 +752,7 @@ export async function getAvailableStaff(
     startAt: string;
     durationMinutes?: number;
     employeeId?: string;
+    sessionId?: string;
   },
   options?: { [key: string]: any },
 ) {
@@ -761,7 +793,12 @@ export async function restoreAppointment(
 /** 改期预约 POST /api/v1/appointments/:id/reschedule */
 export async function rescheduleAppointment(
   id: string,
-  data: { startAt: string; staffId?: string; employeeId?: string },
+  data: {
+    startAt?: string;
+    staffId?: string;
+    employeeId?: string;
+    services?: { serviceId: string; startAt: string; staffId?: string }[];
+  },
   options?: { [key: string]: any },
 ) {
   return request<API.AppointmentItem>(`/api/v1/appointments/${id}/reschedule`, {
@@ -1051,10 +1088,18 @@ export async function unpublishShift(data: API.UnpublishShiftParams, options?: {
 // ===== Timeblock API =====
 
 /** 获取时间块列表 GET /api/v1/timeblocks */
-export async function getTimeblocks(params?: { page?: number; limit?: number }, options?: { [key: string]: any }) {
+export async function getTimeblocks(params?: API.TimeblockListParams, options?: { [key: string]: any }) {
+  const query: Record<string, any> = {};
+  if (params?.page) query.page = params.page;
+  if (params?.limit) query.limit = params.limit;
+  if (params?.locationId) query.locationId = params.locationId;
+  if (params?.staffId) query.staffId = params.staffId;
+  // 同时传入 startDate + endDate 时后端忽略分页，返回全部匹配数据
+  if (params?.startDate) query.startDate = params.startDate;
+  if (params?.endDate) query.endDate = params.endDate;
   return request<API.TimeblockList>('/api/v1/timeblocks', {
     method: 'GET',
-    params: { page: params?.page || 1, limit: params?.limit || 10 },
+    params: query,
     ...(options || {}),
   });
 }
@@ -1130,6 +1175,63 @@ export async function updateEmployee(id: string, data: API.UpdateEmployeeParams,
 export async function deleteEmployee(id: string, options?: { [key: string]: any }) {
   return request<void>(`/api/v1/employees/${id}`, {
     method: 'DELETE',
+    ...(options || {}),
+  });
+}
+
+// ===== Deposit API =====
+
+/** 创建押金/违约金订单 POST /api/v1/deposits */
+export async function createDeposit(data: API.CreateDepositParams, options?: { [key: string]: any }) {
+  return request<API.DepositOrder>('/api/v1/deposits', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data,
+    ...(options || {}),
+  });
+}
+
+/** 查询押金列表 GET /api/v1/deposits */
+export async function getDeposits(params: API.DepositListParams, options?: { [key: string]: any }) {
+  return request<API.DepositListResponse>('/api/v1/deposits', {
+    method: 'GET',
+    params: { ...params },
+    ...(options || {}),
+  });
+}
+
+/** 获取押金详情 GET /api/v1/deposits/:id */
+export async function getDepositDetail(id: string, options?: { [key: string]: any }) {
+  return request<API.DepositDetailResponse>(`/api/v1/deposits/${id}`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 生成支付链接 POST /api/v1/deposits/:id/payment-link */
+export async function generatePaymentLink(id: string, options?: { [key: string]: any }) {
+  return request<API.DepositPayment>(`/api/v1/deposits/${id}/payment-link`, {
+    method: 'POST',
+    ...(options || {}),
+  });
+}
+
+/** 取消押金订单 POST /api/v1/deposits/:id/cancel */
+export async function cancelDeposit(id: string, data?: { staffId?: string }, options?: { [key: string]: any }) {
+  return request<API.DepositOrder>(`/api/v1/deposits/${id}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data: data || {},
+    ...(options || {}),
+  });
+}
+
+/** 手动更新押金状态 PATCH /api/v1/deposits/:id/status */
+export async function updateDepositStatus(id: string, data: { status: API.DepositStatus; staffId?: string }, options?: { [key: string]: any }) {
+  return request<API.DepositOrder>(`/api/v1/deposits/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    data,
     ...(options || {}),
   });
 }
