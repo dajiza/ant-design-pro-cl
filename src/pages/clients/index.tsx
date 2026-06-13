@@ -1,117 +1,192 @@
+import { PlusOutlined } from '@ant-design/icons';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { PageContainer, ProTable } from '@ant-design/pro-components';
-import { useIntl } from '@umijs/max';
-import { Badge, Tag } from 'antd';
-import React, { useRef } from 'react';
-import { getClients } from '@/services/ant-design-pro/api';
+import { Button, message, Space, Switch } from 'antd';
+import React, { useRef, useState } from 'react';
+import {
+  createClient,
+  getClients,
+  updateClient,
+} from '@/services/ant-design-pro/api';
+import ClientDrawer from './components/ClientDrawer';
+import ClientForm from './components/ClientForm';
 
 const ClientList: React.FC = () => {
   const actionRef = useRef<ActionType | null>(null);
-  const intl = useIntl();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingClient, setEditingClient] = useState<API.ClientItem | null>(
+    null,
+  );
+  const [submitting, setSubmitting] = useState(false);
+
+  // drawer
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<API.ClientItem | null>(
+    null,
+  );
+
+  const handleAdd = () => {
+    setEditingClient(null);
+    setModalVisible(true);
+  };
+
+  const handleEdit = (record: API.ClientItem) => {
+    setEditingClient(record);
+    setModalVisible(true);
+  };
+
+  const handleSubmit = async (
+    values: API.CreateClientParams | API.UpdateClientParams,
+  ) => {
+    setSubmitting(true);
+    try {
+      if (editingClient) {
+        await updateClient(editingClient.id, values);
+        message.success('客户更新成功');
+      } else {
+        await createClient(values as API.CreateClientParams);
+        message.success('客户创建成功');
+      }
+      setModalVisible(false);
+      actionRef.current?.reload();
+    } catch (error: any) {
+      message.error(
+        editingClient
+          ? `更新失败: ${error.message}`
+          : `创建失败: ${error.message}`,
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggleActive = async (
+    record: API.ClientItem,
+    checked: boolean,
+  ) => {
+    try {
+      await updateClient(record.id, { active: checked } as any);
+      message.success(checked ? '客户已激活' : '客户已停用');
+      actionRef.current?.reload();
+    } catch (error: any) {
+      message.error(`状态更新失败: ${error.message}`);
+    }
+  };
+
+  const handleRowClick = (record: API.ClientItem) => {
+    setSelectedClient(record);
+    setDrawerOpen(true);
+  };
+
+  const getClientName = (record: API.ClientItem) => {
+    return (
+      record.name ||
+      `${record.firstName || ''} ${record.lastName || ''}`.trim() ||
+      '-'
+    );
+  };
 
   const columns: ProColumns<API.ClientItem>[] = [
     {
-      title: intl.formatMessage({
-        id: 'pages.client.name',
-        defaultMessage: 'Name',
-      }),
-      dataIndex: 'name',
-      render: (_, record) => {
-        const fullName =
-          [record.firstName, record.lastName].filter(Boolean).join(' ') ||
-          record.name ||
-          '-';
-        return <a>{fullName}</a>;
-      },
+      title: '姓名',
+      dataIndex: 'firstName',
+      render: (_, record) => (
+        <a onClick={() => handleRowClick(record)}>{getClientName(record)}</a>
+      ),
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.client.email',
-        defaultMessage: 'Email',
-      }),
+      title: '邮箱',
       dataIndex: 'email',
       copyable: true,
+      hideInSearch: false,
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.client.mobilePhone',
-        defaultMessage: 'Phone',
-      }),
+      title: '电话',
       dataIndex: 'mobilePhone',
+      hideInSearch: true,
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.client.active',
-        defaultMessage: 'Status',
-      }),
+      title: '状态',
       dataIndex: 'active',
+      valueType: 'select',
+      valueEnum: {
+        true: { text: '活跃', status: 'Success' },
+        false: { text: '停用', status: 'Error' },
+      },
+      width: 100,
       render: (_, record) => (
-        <Badge
-          status={record.active ? 'success' : 'default'}
-          text={record.active ? 'Active' : 'Inactive'}
+        <Switch
+          checked={record.active}
+          onChange={(checked) => handleToggleActive(record, checked)}
         />
       ),
-      valueEnum: {
-        true: { text: 'Active', status: 'Success' },
-        false: { text: 'Inactive', status: 'Default' },
-      },
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.client.hasCardOnFile',
-        defaultMessage: 'Card on File',
-      }),
-      dataIndex: 'hasCardOnFile',
-      render: (_, record) =>
-        record.hasCardOnFile ? <Tag color="green">Yes</Tag> : <Tag>No</Tag>,
-      valueEnum: {
-        true: { text: 'Yes' },
-        false: { text: 'No' },
-      },
-    },
-    {
-      title: intl.formatMessage({
-        id: 'pages.client.appointmentCount',
-        defaultMessage: 'Appointments',
-      }),
+      title: '预约数',
       dataIndex: 'appointmentCount',
+      hideInSearch: true,
       sorter: true,
+      width: 90,
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.client.currentAccountBalance',
-        defaultMessage: 'Balance',
-      }),
+      title: '余额',
       dataIndex: 'currentAccountBalance',
-      render: (_, record) => `$${record.currentAccountBalance.toFixed(2)}`,
+      hideInSearch: true,
+      width: 100,
+      render: (_, record) =>
+        record.currentAccountBalance
+          ? `$${(record.currentAccountBalance / 100).toFixed(2)}`
+          : '$0.00',
     },
     {
-      title: intl.formatMessage({
-        id: 'pages.client.createdAt',
-        defaultMessage: 'Created At',
-      }),
+      title: '创建时间',
       dataIndex: 'createdAt',
       valueType: 'dateTime',
+      hideInSearch: true,
       sorter: true,
+      width: 160,
+    },
+    {
+      title: '操作',
+      valueType: 'option',
+      width: 80,
+      render: (_, record) => (
+        <Space size="small">
+          <a onClick={() => handleEdit(record)}>编辑</a>
+        </Space>
+      ),
     },
   ];
 
   return (
     <PageContainer>
       <ProTable<API.ClientItem, API.PageParams>
-        headerTitle={intl.formatMessage({
-          id: 'pages.client.title',
-          defaultMessage: 'Client List',
-        })}
+        headerTitle="客户列表"
         actionRef={actionRef}
         rowKey="id"
-        search={{
-          labelWidth: 120,
-        }}
+        search={{ labelWidth: 'auto' }}
+        toolBarRender={() => [
+          <Button
+            key="add"
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleAdd}
+          >
+            新建客户
+          </Button>,
+        ]}
         request={async (params) => {
           const response = await getClients({
             page: params.current,
             limit: params.pageSize,
+            active:
+              params.active === 'true'
+                ? true
+                : params.active === 'false'
+                  ? false
+                  : undefined,
+            name: params.firstName || undefined,
+            email: params.email || undefined,
           });
           return {
             data: response.data,
@@ -120,10 +195,26 @@ const ClientList: React.FC = () => {
           };
         }}
         columns={columns}
-        pagination={{
-          defaultPageSize: 10,
-          showSizeChanger: true,
-        }}
+        pagination={{ defaultPageSize: 10, showSizeChanger: true }}
+        onRow={(record) => ({
+          onClick: () => handleRowClick(record),
+          style: { cursor: 'pointer' },
+        })}
+      />
+
+      <ClientForm
+        visible={modalVisible}
+        initialValues={editingClient}
+        submitting={submitting}
+        onSubmit={handleSubmit}
+        onCancel={() => setModalVisible(false)}
+      />
+
+      <ClientDrawer
+        open={drawerOpen}
+        client={selectedClient}
+        onClose={() => setDrawerOpen(false)}
+        onRefresh={() => actionRef.current?.reload()}
       />
     </PageContainer>
   );
