@@ -1,4 +1,7 @@
+import type { Payments } from '@square/web-sdk';
+import { payments as initPayments } from '@square/web-sdk';
 import {
+  Button,
   Divider,
   Input,
   InputNumber,
@@ -9,8 +12,13 @@ import {
   Spin,
 } from 'antd';
 import { createStyles } from 'antd-style';
-import React, { useCallback, useMemo, useState } from 'react';
-import { CreditCard, PaymentForm } from 'react-square-web-payments-sdk';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { checkoutAppointment } from '@/services/ant-design-pro/api';
 
 // ---------------------------------------------------------------------------
@@ -32,13 +40,11 @@ type PaymentMethod = 'card' | 'cash' | 'other' | 'none';
 
 const CENTS_PER_DOLLAR = 100;
 
-/** Format cents to display string like $12.34 */
 function formatCents(cents: number): string {
   const dollars = cents / CENTS_PER_DOLLAR;
   return `$${dollars.toFixed(2)}`;
 }
 
-/** Convert dollars (number) to cents */
 function dollarsToCents(dollars: number): number {
   return Math.round(dollars * CENTS_PER_DOLLAR);
 }
@@ -138,6 +144,12 @@ const useStyles = createStyles(({ token, css }) => ({
   `,
   cardContainer: css`
     margin-bottom: 16px;
+    min-height: 200px;
+
+    /* Square iframe styling */
+    iframe {
+      width: 100% !important;
+    }
   `,
   summaryRow: css`
     display: flex;
@@ -158,7 +170,7 @@ const useStyles = createStyles(({ token, css }) => ({
     font-weight: 700;
   `,
   confirmBtn: css`
-    margin-top: auto;
+    margin-top: 16px;
     width: 100%;
   `,
   divider: css`
@@ -174,6 +186,11 @@ const useStyles = createStyles(({ token, css }) => ({
     font-size: 13px;
     color: ${token.colorTextSecondary};
     margin-bottom: 12px;
+  `,
+  cardError: css`
+    color: #ff4d4f;
+    font-size: 13px;
+    margin-top: 8px;
   `,
 }));
 
@@ -196,11 +213,19 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [tipStaffId, setTipStaffId] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
-  const [discountMode, setDiscountMode] = useState<'none' | 'fixed' | 'percent'>('none');
+  const [discountMode, setDiscountMode] = useState<
+    'none' | 'fixed' | 'percent'
+  >('none');
   const [discountAmount, setDiscountAmount] = useState<number | null>(null);
   const [discountPercent, setDiscountPercent] = useState<number | null>(null);
   const [discountReason, setDiscountReason] = useState('');
   const [taxAmount, setTaxAmount] = useState<number | null>(null);
+  const [cardError, setCardError] = useState('');
+
+  // Square refs
+  const cardRef = useRef<any>(null);
+  const paymentsRef = useRef<any>(null);
+  const containerId = 'square-card-container';
 
   // Reset on close
   const handleClose = useCallback(() => {
@@ -215,6 +240,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setDiscountPercent(null);
     setDiscountReason('');
     setTaxAmount(null);
+    setCardError('');
+    cardRef.current = null;
     onClose();
   }, [onClose]);
 
@@ -244,7 +271,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     [services, appointment],
   );
 
-  // Resolve effective tip staff (may be empty → won't send gratuity)
   const effectiveTipStaffId = tipStaffId || defaultStaffId;
 
   const subtotalCents = useMemo(() => {
@@ -267,10 +293,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   }, [customTipDollars, tipPercent, subtotalCents]);
 
   const discountCents = useMemo(() => {
-    if (discountMode === 'fixed' && discountAmount != null && discountAmount > 0) {
+    if (
+      discountMode === 'fixed' &&
+      discountAmount != null &&
+      discountAmount > 0
+    ) {
       return Math.min(dollarsToCents(discountAmount), subtotalCents);
     }
-    if (discountMode === 'percent' && discountPercent != null && discountPercent > 0) {
+    if (
+      discountMode === 'percent' &&
+      discountPercent != null &&
+      discountPercent > 0
+    ) {
       return Math.round(subtotalCents * (discountPercent / 100));
     }
     return 0;
@@ -291,11 +325,56 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim() || '';
   }, [appointment]);
 
+  // umi define 注入的全局变量，编译时替换
+  const squareAppId: string =
+    typeof SQUARE_APPLICATION_ID !== 'undefined' ? SQUARE_APPLICATION_ID : '';
+  const squareLocationId: string =
+    typeof SQUARE_LOCATION_ID !== 'undefined' ? SQUARE_LOCATION_ID : '';
+
+  // ---- Square card initialization ----
+  useEffect(() => {
+    if (!open || paymentMethod !== 'card' || !squareAppId) return;
+
+    let destroyed = false;
+
+    async function initCard() {
+      try {
+        const payments = await initPayments(squareAppId);
+        if (destroyed || !payments) return;
+        paymentsRef.current = payments;
+
+        const card = await payments.card();
+        if (destroyed) return;
+
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        await card.attach(`#${containerId}`);
+        cardRef.current = card;
+      } catch (err) {
+        console.error('Square init failed:', err);
+        if (!destroyed) {
+          setCardError('信用卡组件加载失败');
+        }
+      }
+    }
+
+    initCard();
+
+    return () => {
+      destroyed = true;
+      if (cardRef.current) {
+        cardRef.current.destroy?.();
+        cardRef.current = null;
+      }
+    };
+  }, [open, paymentMethod, squareAppId]);
+
   // ---- gate ----
   const canCheckout =
     appointment && CHECKOUTABLE_STATES.has(appointment.state || '');
 
-  // ---- submit handlers ----
+  // ---- submit ----
   const doCheckout = useCallback(
     async (sourceId?: string) => {
       if (!appointment) return;
@@ -305,7 +384,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           staffId: defaultStaffId,
         };
 
-        // Gratuity
         if (tipCents > 0 && effectiveTipStaffId) {
           req.gratuity = {
             amount: tipCents,
@@ -313,7 +391,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           };
         }
 
-        // Discount
         if (discountCents > 0) {
           if (discountMode === 'fixed' && discountAmount != null) {
             req.discount = { amount: discountCents };
@@ -325,12 +402,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           }
         }
 
-        // Tax
         if (taxCents > 0) {
           req.taxAmount = taxCents;
         }
 
-        // Payment
         if (paymentMethod === 'card' && sourceId) {
           req.payment = {
             method: 'SQUARE_CARD',
@@ -348,13 +423,17 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             amount: totalCents,
           };
         }
-        // paymentMethod === 'none' → no payment, order stays PENDING
 
-        // Notes (not part of CheckoutRequest but kept for potential future use)
         void notes;
 
         const result = await checkoutAppointment(appointment.id, req);
-        message.success('结账成功');
+
+        if (result.payment && result.payment.status !== 'COMPLETED') {
+          message.warning('订单已创建，但支付未完成');
+        } else {
+          message.success('结账成功');
+        }
+
         onSuccess(result);
         handleClose();
       } catch (err: any) {
@@ -384,25 +463,30 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     ],
   );
 
-  // Square card tokenization callback
-  const handleCardTokenize = useCallback(
-    async (token: any) => {
-      if (!token?.token) {
-        message.error('信用卡信息无效');
-        return;
+  // Card payment: tokenize then checkout
+  const handleCardPay = useCallback(async () => {
+    if (!cardRef.current) {
+      setCardError('信用卡组件未加载');
+      return;
+    }
+    setCardError('');
+    try {
+      const tokenResult = await cardRef.current.tokenize();
+      if (tokenResult.status === 'OK') {
+        await doCheckout(tokenResult.token);
+      } else {
+        const errMsg = tokenResult.errors?.[0]?.message || '信用卡信息无效';
+        setCardError(errMsg);
       }
-      await doCheckout(token.token);
-    },
-    [doCheckout],
-  );
-
-  // Cash / Other submit
-  const handleCashOrOtherSubmit = useCallback(() => {
-    doCheckout();
+    } catch (err: any) {
+      setCardError(err?.message || '支付处理失败');
+    }
   }, [doCheckout]);
 
-  const squareAppId = (globalThis as any).SQUARE_APPLICATION_ID || '';
-  const squareLocationId = (globalThis as any).SQUARE_LOCATION_ID || '';
+  // Cash / Other / None submit
+  const handleManualSubmit = useCallback(() => {
+    doCheckout();
+  }, [doCheckout]);
 
   // ---- render helpers ----
   const renderTipPercentButton = (pct: number) => {
@@ -448,12 +532,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div className={styles.body}>
             {/* ========== Left Column ========== */}
             <div className={styles.leftCol}>
-              {/* Client name */}
               {clientName && (
                 <div className={styles.clientName}>客户: {clientName}</div>
               )}
 
-              {/* Service items */}
               <div className={styles.sectionTitle}>服务项目</div>
               {services.length === 0 ? (
                 <div style={{ color: '#999', fontSize: 13 }}>无服务项目</div>
@@ -475,7 +557,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 })
               )}
 
-              {/* Discount section */}
+              {/* Discount */}
               <Divider className={styles.divider} />
               <div className={styles.sectionTitle}>折扣</div>
               <Radio.Group
@@ -524,7 +606,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 />
               )}
 
-              {/* Tax section */}
+              {/* Tax */}
               <Divider className={styles.divider} />
               <div className={styles.sectionTitle}>税费</div>
               <InputNumber
@@ -539,7 +621,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               <Divider className={styles.divider} />
 
-              {/* Tip section */}
+              {/* Tip */}
               <div className={styles.sectionTitle}>小费</div>
               <div className={styles.tipButtons}>
                 {[15, 18, 20].map(renderTipPercentButton)}
@@ -584,11 +666,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
             {/* ========== Right Column ========== */}
             <div className={styles.rightCol}>
-              {/* Payment method switch */}
               <div className={styles.paymentSwitch}>
                 <Radio.Group
                   value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  onChange={(e) => {
+                    setPaymentMethod(e.target.value);
+                    setCardError('');
+                  }}
                   optionType="button"
                   buttonStyle="solid"
                   options={[
@@ -600,42 +684,37 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 />
               </div>
 
-              {/* Credit card form */}
+              {/* Credit card form via @square/web-sdk */}
               {paymentMethod === 'card' && squareAppId && (
-                <div className={styles.cardContainer}>
-                  <PaymentForm
-                    applicationId={squareAppId}
-                    locationId={squareLocationId}
-                    cardTokenizeResponseReceived={handleCardTokenize}
+                <>
+                  <div id={containerId} className={styles.cardContainer} />
+                  {cardError && (
+                    <div className={styles.cardError}>{cardError}</div>
+                  )}
+                  <Button
+                    type="primary"
+                    block
+                    loading={loading}
+                    onClick={handleCardPay}
+                    style={{ marginTop: 8 }}
                   >
-                    <CreditCard
-                      focus="cardNumber"
-                      style={{
-                        '.message-text': { color: '#999' },
-                        '.input': { fontSize: '14px' },
-                      }}
-                    >
-                      {/* The CreditCard component renders its own submit button
-                          which triggers tokenization then our callback */}
-                    </CreditCard>
-                  </PaymentForm>
-                </div>
+                    支付 {formatCents(totalCents)}
+                  </Button>
+                </>
               )}
 
               {paymentMethod === 'card' && !squareAppId && (
                 <div
-                  style={{
-                    color: '#ff4d4f',
-                    fontSize: 13,
-                    marginBottom: 16,
-                  }}
+                  style={{ color: '#ff4d4f', fontSize: 13, marginBottom: 16 }}
                 >
                   Square 配置缺失，无法使用信用卡支付
                 </div>
               )}
 
               {/* Amount summary */}
-              <div className={styles.sectionTitle}>费用明细</div>
+              <div className={styles.sectionTitle} style={{ marginTop: 16 }}>
+                费用明细
+              </div>
               <div className={styles.summaryRow}>
                 <span className={styles.summaryLabel}>小计</span>
                 <span className={styles.summaryValue}>
@@ -645,7 +724,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               {discountCents > 0 && (
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryLabel}>折扣</span>
-                  <span className={styles.summaryValue} style={{ color: '#52c41a' }}>
+                  <span
+                    className={styles.summaryValue}
+                    style={{ color: '#52c41a' }}
+                  >
                     -{formatCents(discountCents)}
                   </span>
                 </div>
@@ -680,21 +762,17 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </span>
               </div>
 
-              {/* Confirm / Submit */}
-              {paymentMethod === 'card' ? (
-                <div className={styles.noPaymentHint}>
-                  请在上方信用卡表单中点击 "Pay" 完成支付
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className={`ant-btn ant-btn-primary ${styles.confirmBtn}`}
-                  disabled={loading}
-                  onClick={handleCashOrOtherSubmit}
-                  style={{ marginTop: 16 }}
+              {/* Manual payment buttons */}
+              {paymentMethod !== 'card' && (
+                <Button
+                  type="primary"
+                  block
+                  loading={loading}
+                  onClick={handleManualSubmit}
+                  className={styles.confirmBtn}
                 >
-                  {loading ? '处理中...' : paymentMethod === 'none' ? '确认结账（无支付）' : '确认结账'}
-                </button>
+                  {paymentMethod === 'none' ? '确认结账（无支付）' : '确认结账'}
+                </Button>
               )}
 
               {paymentMethod === 'none' && (
@@ -704,7 +782,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               )}
               {paymentMethod !== 'card' && paymentMethod !== 'none' && (
                 <div className={styles.noPaymentHint}>
-                  确认后将记录为{paymentMethod === 'cash' ? '现金' : '其他方式'}收款
+                  确认后将记录为{paymentMethod === 'cash' ? '现金' : '其他方式'}
+                  收款
                 </div>
               )}
             </div>

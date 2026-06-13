@@ -13,3 +13,7 @@ declare module '*.tiff';
 declare module 'omit.js';
 declare module 'numeral';
 declare module 'mockjs';
+
+// umi define 注入的全局变量
+declare const SQUARE_APPLICATION_ID: string;
+declare const SQUARE_LOCATION_ID: string;
