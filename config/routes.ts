@@ -21,10 +21,16 @@ export default [
         component: './user/login',
       },
       {
-        name: 'register',
-        path: '/user/register',
-        component: './user/register',
+        name: 'reset-password',
+        path: '/user/reset-password',
+        component: './user/reset-password',
       },
+      // register route disabled - DynamoAuth has no registration endpoint
+      // {
+      //   name: 'register',
+      //   path: '/user/register',
+      //   component: './user/register',
+      // },
     ],
   },
   {
@@ -180,10 +186,26 @@ export default [
     component: './timeblocks',
   },
   {
+    path: '/account',
+    routes: [
+      {
+        path: '/account/change-password',
+        name: 'change-password',
+        component: './account/change-password',
+      },
+    ],
+  },
+  {
     path: '/kanban',
     name: 'front-desk',
     icon: 'appstore',
     component: './kanban',
+  },
+  {
+    path: '/deposits',
+    name: 'deposits',
+    icon: 'dollar',
+    component: './deposits',
   },
   {
     path: '/',
