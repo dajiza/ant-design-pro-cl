@@ -1,4 +1,5 @@
 import {
+  LockOutlined,
   LogoutOutlined,
   SettingOutlined,
   UserOutlined,
@@ -10,7 +11,6 @@ import { createStyles } from 'antd-style';
 import React from 'react';
 import { flushSync } from 'react-dom';
 import { clearTokens } from '@/requestErrorConfig';
-import { outLogin } from '@/services/ant-design-pro/api';
 import HeaderDropdown from '../HeaderDropdown';
 
 export type GlobalHeaderRightProps = {
@@ -50,11 +50,6 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({
    * 退出登录，并且将当前的 url 保存
    */
   const loginOut = async () => {
-    try {
-      await outLogin();
-    } catch (e) {
-      // ignore
-    }
     clearTokens();
     const { search, pathname } = window.location;
     const urlParams = new URL(window.location.href).searchParams;
@@ -121,6 +116,11 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({
             key: 'settings',
             icon: <SettingOutlined />,
             label: '个人设置',
+          },
+          {
+            key: 'change-password',
+            icon: <LockOutlined />,
+            label: '修改密码',
           },
           {
             type: 'divider' as const,

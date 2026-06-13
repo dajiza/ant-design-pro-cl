@@ -4,7 +4,6 @@ import { history } from '@umijs/max';
 import { message, notification } from 'antd';
 
 const TOKEN_KEY = 'token';
-const REFRESH_TOKEN_KEY = 'refreshToken';
 
 export const setToken = (token: string) => {
   localStorage.setItem(TOKEN_KEY, token);
@@ -14,17 +13,8 @@ export const getToken = (): string | null => {
   return localStorage.getItem(TOKEN_KEY);
 };
 
-export const setRefreshToken = (token: string) => {
-  localStorage.setItem(REFRESH_TOKEN_KEY, token);
-};
-
-export const getRefreshToken = (): string | null => {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
-};
-
 export const clearTokens = () => {
   localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
 };
 
 const loginPath = '/user/login';
@@ -94,6 +84,10 @@ export const errorConfig: RequestConfig = {
 
   responseInterceptors: [
     (response) => {
+      const newToken = response.headers?.authorization;
+      if (newToken) {
+        setToken(newToken.replace('Bearer ', ''));
+      }
       return response;
     },
   ],

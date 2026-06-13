@@ -37,9 +37,7 @@ export async function getInitialState(): Promise<{
       });
       return {
         ...msg,
-        name:
-          `${msg.firstName || ''} ${msg.lastName || ''}`.trim() || msg.email,
-        access: msg.role?.id === 1 ? 'admin' : 'user',
+        access: msg.roles?.includes('ADMIN') ? 'admin' : 'user',
       };
     } catch (_error) {
       history.push(loginPath);
@@ -48,11 +46,7 @@ export async function getInitialState(): Promise<{
   };
   // 如果不是登录页面，执行
   const { location } = history;
-  if (
-    ![loginPath, '/user/register', '/user/register-result'].includes(
-      location.pathname,
-    )
-  ) {
+  if (![loginPath].includes(location.pathname)) {
     const currentUser = await fetchUserInfo();
     return {
       fetchUserInfo,
@@ -77,7 +71,6 @@ export const layout: RunTimeLayoutConfig = ({
       <SelectLang key="SelectLang" />,
     ],
     avatarProps: {
-      src: initialState?.currentUser?.avatar,
       title: <AvatarName />,
       render: (_, avatarChildren) => (
         <AvatarDropdown>{avatarChildren}</AvatarDropdown>
