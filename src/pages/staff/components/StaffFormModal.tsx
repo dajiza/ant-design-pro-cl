@@ -1,4 +1,4 @@
-import { Form, Input, Modal, Select } from 'antd';
+import { ColorPicker, Form, Input, Modal, Select } from 'antd';
 import React, { useEffect } from 'react';
 
 interface StaffFormModalProps {
@@ -32,6 +32,7 @@ const StaffFormModal: React.FC<StaffFormModalProps> = ({
         bio: staff.bio,
         roleId: staff.staffRoleId,
         externalNickname: staff.externalNickname,
+        hexColor: staff.hexColor,
       });
     } else if (open) {
       form.resetFields();
@@ -47,7 +48,17 @@ const StaffFormModal: React.FC<StaffFormModalProps> = ({
       onOk={() => form.submit()}
       okText={isEdit ? '保存' : '创建'}
     >
-      <Form form={form} layout="vertical" onFinish={onOk}>
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={(values) => {
+          const { hexColor, ...rest } = values;
+          onOk({
+            ...rest,
+            hexColor: hexColor?.toHexString?.() ?? hexColor,
+          });
+        }}
+      >
         <Form.Item name="firstName" label="名" rules={[{ required: true }]}>
           <Input />
         </Form.Item>
@@ -71,6 +82,9 @@ const StaffFormModal: React.FC<StaffFormModalProps> = ({
             placeholder="选择角色"
             options={roles.map((r) => ({ value: r.id, label: r.name }))}
           />
+        </Form.Item>
+        <Form.Item name="hexColor" label="标识颜色">
+          <ColorPicker format="hex" showText />
         </Form.Item>
       </Form>
     </Modal>

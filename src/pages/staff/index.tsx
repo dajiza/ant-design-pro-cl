@@ -56,7 +56,14 @@ const StaffPage: React.FC = () => {
       search: false,
       width: 60,
       render: (_, record) => (
-        <Avatar size="small" src={record.avatar} icon={<UserOutlined />}>
+        <Avatar
+          size="small"
+          src={record.avatar}
+          icon={<UserOutlined />}
+          style={
+            record.hexColor ? { backgroundColor: record.hexColor } : undefined
+          }
+        >
           {(record.firstName?.[0] || '?').toUpperCase()}
         </Avatar>
       ),
@@ -66,6 +73,31 @@ const StaffPage: React.FC = () => {
       dataIndex: 'name',
       render: (_, record) => record.displayName || record.name || '-',
       width: 120,
+    },
+    {
+      title: '颜色',
+      dataIndex: 'hexColor',
+      search: false,
+      width: 70,
+      render: (_, record) =>
+        record.hexColor ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                display: 'inline-block',
+                width: 16,
+                height: 16,
+                borderRadius: 4,
+                backgroundColor: record.hexColor,
+              }}
+            />
+            <span style={{ fontSize: 12, color: '#888' }}>
+              {record.hexColor}
+            </span>
+          </div>
+        ) : (
+          '-'
+        ),
     },
     {
       title: '邮箱',

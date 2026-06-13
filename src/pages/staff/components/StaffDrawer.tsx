@@ -84,7 +84,13 @@ const StaffDrawer: React.FC<StaffDrawerProps> = ({
         width={520}
       >
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <Avatar size={64} src={staff.avatar}>
+          <Avatar
+            size={64}
+            src={staff.avatar}
+            style={
+              staff.hexColor ? { backgroundColor: staff.hexColor } : undefined
+            }
+          >
             {(staff.firstName?.[0] || staff.name?.[0] || '?').toUpperCase()}
           </Avatar>
         </div>
@@ -107,6 +113,26 @@ const StaffDrawer: React.FC<StaffDrawerProps> = ({
           </Descriptions.Item>
           <Descriptions.Item label="昵称">
             {staff.nickname || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label="标识颜色">
+            {staff.hexColor ? (
+              <span
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 16,
+                    height: 16,
+                    borderRadius: 4,
+                    backgroundColor: staff.hexColor,
+                  }}
+                />
+                {staff.hexColor}
+              </span>
+            ) : (
+              '-'
+            )}
           </Descriptions.Item>
           <Descriptions.Item label="状态">
             <Tag color={staff.active ? 'green' : 'red'}>
