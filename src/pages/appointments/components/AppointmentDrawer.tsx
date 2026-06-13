@@ -23,6 +23,8 @@ import {
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
 import React, { useState } from 'react';
 import {
   addAppointmentTags,
@@ -36,8 +38,12 @@ import {
   updateAppointmentState,
 } from '@/services/ant-design-pro/api';
 import AppointmentStateBadge from './AppointmentStateBadge';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 import CancelModal from './CancelModal';
-import RescheduleModal from './RescheduleModal';
+import RescheduleModal, { type RescheduleResult } from './RescheduleModal';
 
 const { Text, Link } = Typography;
 
@@ -70,10 +76,14 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
   const locationName =
     (appointment.location as any)?.name || appointment.locationId || '-';
   const locationTz = (appointment.location as any)?.tz || 'UTC';
-  const startTime = dayjs(appointment.startAt).format('YYYY-MM-DD HH:mm');
-  const endTime = appointment.endAt
-    ? dayjs(appointment.endAt).format('HH:mm')
-    : '-';
+  const toLocal = (v?: string | null) => {
+    if (!v) return null;
+    const utc = v.endsWith('Z') ? v : `${v}Z`;
+    return dayjs(utc).tz(locationTz);
+  };
+  const startTime =
+    toLocal(appointment.startAt)?.format('YYYY-MM-DD HH:mm') ?? '-';
+  const endTime = toLocal(appointment.endAt)?.format('HH:mm') ?? '-';
   const durationMinutes = appointment.duration
     ? Math.round(appointment.duration / 60)
     : '-';
@@ -151,10 +161,10 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
     }
   };
 
-  const handleReschedule = async (startAt: string) => {
+  const handleReschedule = async (result: RescheduleResult) => {
     setLoading(true);
     try {
-      await rescheduleAppointment(appointment?.id, { startAt });
+      await rescheduleAppointment(appointment?.id, result);
       message.success('预约已改期');
       setRescheduleModalOpen(false);
       onRefresh();
@@ -264,6 +274,11 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
           <Descriptions.Item label="来源">
             {appointment.bookedByType || '-'}
           </Descriptions.Item>
+          {appointment.employee && (
+            <Descriptions.Item label="技师">
+              {`${appointment.employee.firstName}${appointment.employee.lastName ? ' ' + appointment.employee.lastName : ''}`}
+            </Descriptions.Item>
+          )}
           {appointment.orderId && (
             <Descriptions.Item label="订单">
               {appointment.orderId}
@@ -429,7 +444,7 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
         <Divider style={{ marginBottom: 8 }} />
         <Text type="secondary" style={{ fontSize: 12 }}>
           ID: {appointment.id} | 创建于:{' '}
-          {dayjs(appointment.createdAt).format('YYYY-MM-DD HH:mm')}
+          {toLocal(appointment.createdAt)?.format('YYYY-MM-DD HH:mm') ?? '-'}
         </Text>
       </Drawer>
 
@@ -442,6 +457,16 @@ const AppointmentDrawer: React.FC<AppointmentDrawerProps> = ({
       <RescheduleModal
         open={rescheduleModalOpen}
         appointmentId={appointment.id}
+        appointmentServices={(appointment.appointmentServices || []).map(
+          (svc: any) => ({
+            serviceId: svc.serviceId || '',
+            serviceName: svc.name || svc.serviceId || '',
+            staffId: svc.staffId || undefined,
+            startAt: svc.startAt || '',
+          }),
+        )}
+        employeeId={appointment.employeeId}
+        locationTz={locationTz}
         onCancel={() => setRescheduleModalOpen(false)}
         onOk={handleReschedule}
         loading={loading}

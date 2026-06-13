@@ -107,9 +107,12 @@ const AppointmentCalendar: React.FC = () => {
     useState<AppointmentItem | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchStaffList = async () => {
+  const fetchStaffList = async (locationId?: string | null) => {
     try {
-      const response = await getStaff({ limit: 100 });
+      const response = await getStaff({
+        limit: 100,
+        locationId: locationId || undefined,
+      });
       setStaffList(response.data.filter((s: StaffItem) => s.active));
     } catch {
       message.error('获取员工列表失败');
@@ -136,11 +139,30 @@ const AppointmentCalendar: React.FC = () => {
     );
   };
 
+  // Convert real UTC time to "fake UTC" (store local time as Z string)
+  // so FullCalendar with timeZone="UTC" displays store-local hours
+  const toFakeUtc = (iso: string): string => {
+    const utcIso = new Date(iso).toISOString();
+    return (
+      dayjs(utcIso).tz(currentTimezone!).format('YYYY-MM-DDTHH:mm:ss') + 'Z'
+    );
+  };
+
+  // Convert "fake UTC" date range from FullCalendar to real UTC for API query
+  const fakeUtcToReal = (fakeUtc: string): string => {
+    const local = fakeUtc.replace('Z', '');
+    return dayjs.tz(local, currentTimezone!).toISOString();
+  };
+
   const fetchAppointments = async (start: string, end: string) => {
     try {
+      // start/end are "fake UTC" from FullCalendar (store local time with Z)
+      // Convert to real UTC for the API query
+      const realStart = fakeUtcToReal(start);
+      const realEnd = fakeUtcToReal(end);
       const response = await getAppointmentsByDateRange({
-        startDate: start,
-        endDate: end,
+        startDate: realStart,
+        endDate: realEnd,
         locationId: selectedLocationId || undefined,
       });
       const calendarEvents: any[] = [];
@@ -151,28 +173,15 @@ const AppointmentCalendar: React.FC = () => {
           '未知客户';
         const state = apt.state || 'BOOKED';
         const bg = apt.cancelled ? '#ff4d4f' : stateColors[state] || '#1677ff';
-        const startUtc = apt.startAt.endsWith('Z')
-          ? apt.startAt
-          : `${apt.startAt}Z`;
-        const endUtc = apt.endAt?.endsWith('Z')
-          ? apt.endAt
-          : apt.endAt
-            ? `${apt.endAt}Z`
-            : null;
-        const startLocal = dayjs(startUtc)
-          .tz(currentTimezone)
-          .format('YYYY-MM-DDTHH:mm:ss');
-        const endLocal = endUtc
-          ? dayjs(endUtc).tz(currentTimezone).format('YYYY-MM-DDTHH:mm:ss')
-          : null;
+
         const services = (apt.appointmentServices as any[]) || [];
 
         if (services.length === 0) {
           calendarEvents.push({
             id: apt.id,
             title: clientName,
-            start: startLocal,
-            end: endLocal,
+            start: toFakeUtc(apt.startAt),
+            end: apt.endAt ? toFakeUtc(apt.endAt) : null,
             backgroundColor: bg,
             borderColor: bg,
             resourceId: null,
@@ -183,8 +192,8 @@ const AppointmentCalendar: React.FC = () => {
             calendarEvents.push({
               id: `${apt.id}_svc_${idx}`,
               title: `${clientName} - ${svc.name || '服务'}`,
-              start: startLocal,
-              end: endLocal,
+              start: toFakeUtc(svc.startAt || apt.startAt),
+              end: svc.endAt ? toFakeUtc(svc.endAt) : null,
               backgroundColor: bg,
               borderColor: bg,
               resourceId: svc.staffId || null,
@@ -220,13 +229,17 @@ const AppointmentCalendar: React.FC = () => {
   }, [locationList, currentTimezone]);
 
   useEffect(() => {
-    if (currentStart && currentEnd && staffList.length > 0) {
+    if (currentStart && currentEnd && staffList.length > 0 && currentTimezone) {
       setLoading(true);
       fetchAppointments(currentStart, currentEnd).finally(() =>
         setLoading(false),
       );
     }
-  }, [selectedLocationId, staffList.length]);
+  }, [selectedLocationId, staffList.length, currentTimezone]);
+
+  useEffect(() => {
+    fetchStaffList(selectedLocationId);
+  }, [selectedLocationId]);
 
   const handleDatesSet = useCallback(
     async (arg: DatesSetArg) => {
@@ -239,7 +252,7 @@ const AppointmentCalendar: React.FC = () => {
         setLoading(false);
       }
     },
-    [currentStart, currentEnd, staffList],
+    [currentStart, currentEnd, staffList, currentTimezone],
   );
 
   const handleEventClick = (arg: EventClickArg) => {
@@ -374,9 +387,16 @@ const AppointmentCalendar: React.FC = () => {
             datesSet={handleDatesSet}
             eventClick={handleEventClick}
             selectable
-            timeZone="local"
-            slotMinTime="00:00:00"
-            slotMaxTime="24:00:00"
+            timeZone="UTC"
+            slotMinTime="06:00:00"
+            slotMaxTime="22:00:00"
+            slotDuration="00:05:00"
+            slotLabelInterval="00:15:00"
+            slotLabelFormat={{
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+            }}
             allDaySlot={false}
             height="auto"
             eventContent={(arg) => {
@@ -459,6 +479,7 @@ const AppointmentCalendar: React.FC = () => {
         {apt && (
           <>
             <Descriptions column={2} size="small">
+              <Descriptions.Item label="预约 ID">{apt.id}</Descriptions.Item>
               <Descriptions.Item label="客户">
                 {apt.client?.name || '-'}
               </Descriptions.Item>
@@ -466,11 +487,20 @@ const AppointmentCalendar: React.FC = () => {
                 {(apt.location as any)?.name || apt.locationId || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="开始">
-                {dayjs(apt.startAt).format('YYYY-MM-DD HH:mm')}
+                {dayjs(
+                  apt.startAt?.endsWith('Z') ? apt.startAt : `${apt.startAt}Z`,
+                )
+                  .tz(currentTimezone)
+                  .format('YYYY-MM-DD HH:mm')}
               </Descriptions.Item>
               <Descriptions.Item label="时长">
                 {apt.duration ? `${Math.round(apt.duration / 60)} min` : '-'}
               </Descriptions.Item>
+              {apt.employee && (
+                <Descriptions.Item label="技师">
+                  {`${apt.employee.firstName}${apt.employee.lastName ? ' ' + apt.employee.lastName : ''}`}
+                </Descriptions.Item>
+              )}
             </Descriptions>
             {(apt.appointmentServices as any[])?.length > 0 && (
               <>
